@@ -5,7 +5,7 @@ endif
 CFL=$(CFLAGS) $(CISA) -Wall -Wshadow -Wcast-align -Wredundant-decls -Wbad-function-cast -Wcast-qual -Wwrite-strings -Waggregate-return -Wstrict-prototypes -Wmissing-prototypes -D_FILE_OFFSET_BITS=64 -DVERSION=$(VERSION)
 
 PACKAGE=cpuid
-VERSION=20100902
+VERSION=20101002
 RELEASE=1
 
 PROG=$(PACKAGE)
@@ -65,6 +65,8 @@ todd: $(PROG).i386 $(PROG).x86_64
 	rm -f ~/.bin/execs/x86_64/$(PROG)
 	cp -p $(PROG).i386   ~/.bin/execs/i586/$(PROG)
 	cp -p $(PROG).x86_64 ~/.bin/execs/x86_64/$(PROG)
+	chmod 777 ~/.bin/execs/i586/$(PROG)
+	chmod 777 ~/.bin/execs/x86_64/$(PROG)
 	(cd ~/.bin/execs; prop i586/$(PROG) x86_64/$(PROG))
 
 # Release rules

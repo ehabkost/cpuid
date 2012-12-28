@@ -1,4 +1,4 @@
-%define version 20100902
+%define version 20101002
 %define release 1
 Summary: dumps CPUID information about the CPU(s)
 Name: cpuid

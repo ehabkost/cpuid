@@ -1,3 +1,58 @@
+Fri Mar  4 2011 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c,cpuid.man: Added Celeron T1000 series, previously missing.
+	* cpuid.c,cpuid.man: Added Celeron Mobile P4000, U3000 series.
+	* cpuid.c,cpuid.man: Added current Sandy Bridge processors.
+
+Thu Mar  3 2011 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added detection of PCIDs & TSC-DEADLINE.
+	* cpuid.c: Verified Mike Stroyan CPUID 2 cache meanings from Intel CPUID
+	  document (241618-037).  Added 0x76 meaning.
+	* cpuid.c: Added various new flags from Intel 241618-037.
+	* cpuid.c,cpuid.man: Added AMD family 14h processors.
+	* cpuid.c,cpuid.man: Updated Intel process id table, mostly as just
+	  generalizations.
+
+Tue Nov  9 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Update the usage() screen, since some of its -i and -1
+	  comments are incorrect now.
+
+Mon Oct  4 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c, cpuid.man: Added AMD Geode LX.
+	* cpuid.c: Added NSC Geode GX2 and AMD Geode GX.
+	* cpuid.c, cpuid.man: Added AMD Geode NX.
+
+Sat Oct  2 2010 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+	* cpuid.c,cpuid.man: Added Intel Atom N500.
+
+Thu Sep 30 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c,cpuid.man: Added support for Intel Tolapai (SoC).
+	* cpuid.c,cpuid.man: Added support for Intel Clarkdale chips from
+	  specification update 323179.
+	* cpuid.c: Generalized decode_amd_model by adding full brand tables for
+	  AMD chips.  If a BIOS doesn't recognize a chip it writes
+	  "model unknown" into its brand string via MSR's.
+	  decode_override_brand detects that and uses the decode_amd_model brand
+	  to differentiate CPUs.
+	* cpuid.c: Corrected 80000001/ebx PkgType, BrandId, and str1 bit fields.
+	* cpuid.c: Corrected problems with brand field decoding because its bit
+	  field with differs from architecture to architecture.
+	* cpuid.c: decode_amd_model: the partialmodel decrement special case
+	  applies only to XF=1,F=15; and not to XF=2,F=15.
+
+Mon Sep 27 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added support for NSC/AMD Geode GX1.
+
+Wed Sep  8 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Corrected the Transmeta processor revisions, which should've
+	  been in hex instead of octal.
+
+Thu Sep  2 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added a couple vague steppings for Transmeta Efficeon TM8000
+	  processors.  Updated some transmeta bitfields.  This is all done
+	  blind, as I have no examples of these chips, little documentation, and
+	  the company is long defunct.
+
 Thu Sep  2 2010 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 	* cpuid.c: Fixed a few header strings that had incorrect function hex

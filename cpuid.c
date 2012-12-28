@@ -1,6 +1,6 @@
 /*
 ** cpuid dumps CPUID information for each CPU.
-** Copyright 2003,2004,2005,2006,2010 by Todd Allen.
+** Copyright 2003,2004,2005,2006,2010,2011 by Todd Allen.
 ** 
 ** This program is free software; you can redistribute it and/or
 ** modify it under the terms of the GNU General Public License
@@ -156,7 +156,8 @@ typedef enum {
    VENDOR_UMC,
    VENDOR_NEXGEN,
    VENDOR_RISE,
-   VENDOR_SIS
+   VENDOR_SIS,
+   VENDOR_NSC
 } vendor_t;
 
 #define __F(v)     ((v) & 0x0ff00f00)
@@ -177,9 +178,6 @@ typedef enum {
 
 #define __B(v)     ((v) & 0x000000ff)
 #define _B(v)      (v)
-
-#define __XB(v)    ((v) & 0x00000fff)
-#define _XB(v)     (v)
 
 #define _FM(xf,f,xm,m)     (_XF(xf) + _F(f) + _XM(xm) + _M(m))
 #define _FMS(xf,f,xm,m,s)  (_XF(xf) + _F(f) + _XM(xm) + _M(m) + _S(s))
@@ -226,6 +224,7 @@ typedef struct {
    unsigned int   transmeta_proc_rev;
    char           brand[48];
    char           transmeta_info[48];
+   char           override_brand[48];
 
    struct mp {
       const char*    method;
@@ -255,6 +254,7 @@ typedef struct {
          boolean    sempron;
          boolean    phenom;
          boolean    v_series;
+         boolean    geode;
          boolean    turion;
          boolean    neo;
          boolean    athlon_fx;
@@ -300,18 +300,855 @@ typedef struct {
                     0, 0, 0, 0, 0, 0, \
                     { 0, 0 }, \
                     { 0, 0 }, \
-                    0, 0, 0, 0, 0, "", "", \
+                    0, 0, 0, 0, 0, "", "", "",   \
                     { NULL, -1, -1 }, \
                     { FALSE, \
                       { FALSE, FALSE, FALSE, FALSE, FALSE, \
                         FALSE, FALSE, FALSE, FALSE }, \
                       { FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, \
-                        FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, \
+                        FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, \
                         FALSE, 0 } }, \
                     { FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE }, \
                     FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, \
                     FALSE, FALSE, FALSE, \
                     FALSE, FALSE }
+
+static void
+decode_amd_model(const code_stash_t*  stash,
+                 const char**         brand_pre,
+                 const char**         brand_post,
+                 char*                proc)
+{
+   *brand_pre  = NULL;
+   *brand_post = NULL;
+   *proc       = '\0';
+
+   if (stash == NULL) return;
+
+   if (__F(stash->val_1_eax) == _XF(0) + _F(15)
+       && __M(stash->val_1_eax) < _XM(4) + _M(0)) {
+      /*
+      ** Algorithm from:
+      **    Revision Guide for AMD Athlon 64 and AMD Opteron Processors 
+      **    (25759 Rev 3.79), Constructing the Processor Name String.
+      ** But using only the Processor numbers.
+      */
+      unsigned int  bti;
+      unsigned int  NN;
+
+      if (__B(stash->val_1_ebx) != 0) {
+         bti = BIT_EXTRACT_LE(__B(stash->val_1_ebx), 5, 8) << 2;
+         NN  = BIT_EXTRACT_LE(__B(stash->val_1_ebx), 0, 5);
+      } else if (BIT_EXTRACT_LE(stash->val_80000001_ebx, 0, 12) != 0) {
+         bti = BIT_EXTRACT_LE(stash->val_80000001_ebx, 6, 12);
+         NN  = BIT_EXTRACT_LE(stash->val_80000001_ebx, 0,  6);
+      } else {
+         return;
+      }
+
+#define XX  (22 + NN)
+#define YY  (38 + 2*NN)
+#define ZZ  (24 + NN)
+#define TT  (24 + NN)
+#define RR  (45 + 5*NN)
+#define EE  ( 9 + NN)
+
+      switch (bti) {
+      case 0x04:
+         *brand_pre = "AMD Athlon(tm) 64";
+         sprintf(proc, "Processor %02d00+", XX);
+         break;
+      case 0x05:
+         *brand_pre = "AMD Athlon(tm) 64 X2 Dual Core";
+         sprintf(proc, "Processor %02d00+", XX);
+         break;
+      case 0x06:
+         *brand_pre  = "AMD Athlon(tm) 64";
+         sprintf(proc, "FX-%02d", ZZ);
+         *brand_post = "Dual Core";
+         break;
+      case 0x08:
+         *brand_pre = "AMD Athlon(tm) 64";
+         sprintf(proc, "Processor %02d00+", XX);
+         break;
+      case 0x09:
+         *brand_pre = "AMD Athlon(tm) 64";
+         sprintf(proc, "Processor %02d00+", XX);
+         break;
+      case 0x0a:
+         *brand_pre = "AMD Turion(tm) Mobile Technology";
+         sprintf(proc, "ML-%02d", XX);
+         break;
+      case 0x0b:
+         *brand_pre = "AMD Turion(tm) Mobile Technology";
+         sprintf(proc, "MT-%02d", XX);
+         break;
+      case 0x0c:
+      case 0x0d:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 1%02d", YY);
+         break;
+      case 0x0e:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 1%02d HE", YY);
+         break;
+      case 0x0f:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 1%02d EE", YY);
+         break;
+      case 0x10:
+      case 0x11:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 2%02d", YY);
+         break;
+      case 0x12:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 2%02d HE", YY);
+         break;
+      case 0x13:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 2%02d EE", YY);
+         break;
+      case 0x14:
+      case 0x15:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 8%02d", YY);
+         break;
+      case 0x16:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 8%02d HE", YY);
+         break;
+      case 0x17:
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 8%02d EE", YY);
+         break;
+      case 0x18:
+         *brand_pre = "AMD Athlon(tm) 64";
+         sprintf(proc, "Processor %02d00+", EE);
+      case 0x1d:
+         *brand_pre = "Mobile AMD Athlon(tm) XP-M";
+         sprintf(proc, "Processor %02d00+", XX);
+         break;
+      case 0x1e:
+         *brand_pre = "Mobile AMD Athlon(tm) XP-M";
+         sprintf(proc, "Processor %02d00+", XX);
+         break;
+      case 0x20:
+         *brand_pre = "AMD Athlon(tm) XP";
+         sprintf(proc, "Processor %02d00+", XX);
+         break;
+      case 0x21:
+      case 0x23:
+         *brand_pre = "Mobile AMD Sempron(tm)";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case 0x22:
+      case 0x26:
+         *brand_pre = "AMD Sempron(tm)";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case 0x24:
+         *brand_pre = "AMD Athlon(tm) 64";
+         sprintf(proc, "FX-%02d", ZZ);
+         break;
+      case 0x29:
+      case 0x2c:
+      case 0x2d:
+      case 0x38:
+      case 0x3b:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 1%02d", RR);
+         break;
+      case 0x2a:
+      case 0x30:
+      case 0x31:
+      case 0x39:
+      case 0x3c:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 2%02d", RR);
+         break;
+      case 0x2b:
+      case 0x34:
+      case 0x35:
+      case 0x3a:
+      case 0x3d:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 8%02d", RR);
+         break;
+      case 0x2e:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 1%02d HE", RR);
+         break;
+      case 0x2f:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 1%02d EE", RR);
+         break;
+      case 0x32:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 2%02d HE", RR);
+         break;
+      case 0x33:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 2%02d EE", RR);
+         break;
+      case 0x36:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 8%02d HE", RR);
+         break;
+      case 0x37:
+         *brand_pre = "Dual Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 8%02d EE", RR);
+         break;
+      }
+
+#undef XX
+#undef YY
+#undef ZZ
+#undef TT
+#undef RR
+#undef EE
+   } else if (__F(stash->val_1_eax) == _XF(0) + _F(15)
+              && __M(stash->val_1_eax) >= _XM(4) + _M(0)) {
+      /*
+      ** Algorithm from:
+      **    Revision Guide for AMD NPT Family 0Fh Processors (33610 Rev 3.46),
+      **    Constructing the Processor Name String.
+      ** But using only the Processor numbers.
+      */
+      unsigned int  bti;
+      unsigned int  pwrlmt;
+      unsigned int  NN;
+      unsigned int  pkgtype;
+      unsigned int  cmpcap;
+
+      pwrlmt  = ((BIT_EXTRACT_LE(stash->val_80000001_ebx, 6, 9) << 1)
+                 + BIT_EXTRACT_LE(stash->val_80000001_ebx, 14, 15));
+      bti     = BIT_EXTRACT_LE(stash->val_80000001_ebx, 9, 14);
+      NN      = ((BIT_EXTRACT_LE(stash->val_80000001_ebx, 15, 16) << 5)
+                 + BIT_EXTRACT_LE(stash->val_80000001_ebx, 0, 5));
+      pkgtype = BIT_EXTRACT_LE(stash->val_80000001_eax, 4, 6);
+      cmpcap  = ((BIT_EXTRACT_LE(stash->val_80000008_ecx, 0, 8) > 0)
+                 ? 0x1 : 0x0);
+
+#define RR  (NN - 1)
+#define PP  (26 + NN)
+#define TT  (15 + cmpcap*10 + NN)
+#define ZZ  (57 + NN)
+#define YY  (29 + NN)
+
+#define PKGTYPE(pkgtype)  ((pkgtype) << 11)
+#define CMPCAP(cmpcap)    ((cmpcap)  <<  9)
+#define BTI(bti)          ((bti)     <<  4)
+#define PWRLMT(pwrlmt)    (pwrlmt)
+
+      switch (PKGTYPE(pkgtype) + CMPCAP(cmpcap) + BTI(bti) + PWRLMT(pwrlmt)) {
+      /* Table 7: Name String Table for F (1207) and Fr3 (1207) Processors */
+      case PKGTYPE(1) + CMPCAP(0) + BTI(1) + PWRLMT(2):
+         *brand_pre = "AMD Opteron(tm)";
+         sprintf(proc, "Processor 22%02d EE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(1) + PWRLMT(2):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 22%02d EE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(0) + PWRLMT(2) :
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 12%02d EE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(0) + PWRLMT(6):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 12%02d HE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(1) + PWRLMT(6):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 22%02d HE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(1) + PWRLMT(10):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 22%02d", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(1) + PWRLMT(12):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 22%02d SE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(4) + PWRLMT(2):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 82%02d EE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(4) + PWRLMT(6):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 82%02d HE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(4) + PWRLMT(10):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 82%02d", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(4) + PWRLMT(12):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 82%02d SE", RR);
+         break;
+      case PKGTYPE(1) + CMPCAP(1) + BTI(6) + PWRLMT(14):
+         *brand_pre = "AMD Athlon(tm) 64";
+         sprintf(proc, "FX-%02d", ZZ);
+         break;
+      /* Table 8: Name String Table for AM2 and ASB1 Processors */
+      case PKGTYPE(3) + CMPCAP(0) + BTI(1) + PWRLMT(5):
+         *brand_pre = "AMD Sempron(tm)";
+         sprintf(proc, "Processor LE-1%02d0", RR);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(2) + PWRLMT(6):
+         *brand_pre = "AMD Athlon(tm)";
+         sprintf(proc, "Processor LE-1%02d0", ZZ);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(3) + PWRLMT(6):
+         *brand_pre = "AMD Athlon(tm)";
+         sprintf(proc, "Processor 1%02d0B", ZZ);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(1):
+      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(2):
+      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(3):
+      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(4):
+      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(5):
+      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(8):
+         *brand_pre = "AMD Athlon(tm) 64";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(5) + PWRLMT(2):
+         *brand_pre = "AMD Sempron(tm)";
+         sprintf(proc, "Processor %02d50p", RR);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(6) + PWRLMT(4):
+      case PKGTYPE(3) + CMPCAP(0) + BTI(6) + PWRLMT(8):
+         *brand_pre = "AMD Sempron(tm)";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(7) + PWRLMT(1):
+      case PKGTYPE(3) + CMPCAP(0) + BTI(7) + PWRLMT(2):
+         *brand_pre = "AMD Sempron(tm)";
+         sprintf(proc, "Processor %02d0U", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(8) + PWRLMT(2):
+      case PKGTYPE(3) + CMPCAP(0) + BTI(8) + PWRLMT(3):
+         *brand_pre = "AMD Athlon(tm)";
+         sprintf(proc, "Processor %02d50e", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(9) + PWRLMT(2):
+         *brand_pre = "AMD Athlon(tm) Neo";
+         sprintf(proc, "Processor MV-%02d", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(0) + BTI(12) + PWRLMT(2):
+         *brand_pre = "AMD Sempron(tm)";
+         sprintf(proc, "Processor 2%02dU", RR);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(1) + PWRLMT(6):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 12%02d HE", RR);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(1) + PWRLMT(10):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 12%02d", RR);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(1) + PWRLMT(12):
+         *brand_pre = "Dual-Core AMD Opteron(tm)";
+         sprintf(proc, "Processor 12%02d SE", RR);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(3) + PWRLMT(3):
+         *brand_pre = "AMD Athlon(tm) X2 Dual Core";
+         sprintf(proc, "Processor BE-2%02d0", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(1):
+      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(2):
+      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(6):
+      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(8):
+      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(12):
+         *brand_pre = "AMD Athlon(tm) 64 X2 Dual Core";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(5) + PWRLMT(12):
+         *brand_pre  = "AMD Athlon(tm) 64";
+         sprintf(proc, "FX-%02d", ZZ);
+         *brand_post = "Dual Core";
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(6) + PWRLMT(6):
+         *brand_pre = "AMD Sempron(tm) Dual Core";
+         sprintf(proc, "Processor %02d00", RR);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(7) + PWRLMT(3):
+         *brand_pre = "AMD Athlon(tm) Dual Core";
+         sprintf(proc, "Processor %02d50e", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(7) + PWRLMT(6):
+      case PKGTYPE(3) + CMPCAP(1) + BTI(7) + PWRLMT(7):
+         *brand_pre = "AMD Athlon(tm) Dual Core";
+         sprintf(proc, "Processor %02d00B", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(8) + PWRLMT(3):
+         *brand_pre = "AMD Athlon(tm) Dual Core";
+         sprintf(proc, "Processor %02d50B", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(9) + PWRLMT(1):
+         *brand_pre = "AMD Athlon(tm) X2 Dual Core";
+         sprintf(proc, "Processor %02d50e", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(10) + PWRLMT(1):
+      case PKGTYPE(3) + CMPCAP(1) + BTI(10) + PWRLMT(2):
+         *brand_pre = "AMD Athlon(tm) Neo X2 Dual Core";
+         sprintf(proc, "Processor %02d50e", TT);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(11) + PWRLMT(0):
+         *brand_pre = "AMD Turion(tm) Neo X2 Dual Core";
+         sprintf(proc, "Processor L6%02d", RR);
+         break;
+      case PKGTYPE(3) + CMPCAP(1) + BTI(12) + PWRLMT(0):
+         *brand_pre = "AMD Turion(tm) Neo X2 Dual Core";
+         sprintf(proc, "Processor L3%02d", RR);
+         break;
+      /* Table 9: Name String Table for S1g1 Processors */
+      case PKGTYPE(0) + CMPCAP(0) + BTI(1) + PWRLMT(2):
+         *brand_pre = "AMD Athlon(tm) 64";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case PKGTYPE(0) + CMPCAP(0) + BTI(2) + PWRLMT(12):
+         *brand_pre = "AMD Turion(tm) 64 Mobile Technology";
+         sprintf(proc, "MK-%02d", YY);
+         break;
+      case PKGTYPE(0) + CMPCAP(0) + BTI(3) + PWRLMT(1):
+         *brand_pre = "Mobile AMD Sempron(tm)";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case PKGTYPE(0) + CMPCAP(0) + BTI(3) + PWRLMT(6):
+      case PKGTYPE(0) + CMPCAP(0) + BTI(3) + PWRLMT(12):
+         *brand_pre = "Mobile AMD Sempron(tm)";
+         sprintf(proc, "Processor %02d00+", PP);
+         break;
+      case PKGTYPE(0) + CMPCAP(0) + BTI(4) + PWRLMT(2):
+         *brand_pre = "AMD Sempron(tm)";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case PKGTYPE(0) + CMPCAP(0) + BTI(6) + PWRLMT(4):
+      case PKGTYPE(0) + CMPCAP(0) + BTI(6) + PWRLMT(6):
+      case PKGTYPE(0) + CMPCAP(0) + BTI(6) + PWRLMT(12):
+         *brand_pre = "AMD Athlon(tm)";
+         sprintf(proc, "Processor TF-%02d", TT);
+         break;
+      case PKGTYPE(0) + CMPCAP(0) + BTI(7) + PWRLMT(3):
+         *brand_pre = "AMD Athlon(tm)";
+         sprintf(proc, "Processor L1%02d", RR);
+         break;
+      case PKGTYPE(0) + CMPCAP(1) + BTI(1) + PWRLMT(12):
+         *brand_pre = "AMD Sempron(tm)";
+         sprintf(proc, "Processor TJ-%02d", YY);
+         break;
+      case PKGTYPE(0) + CMPCAP(1) + BTI(2) + PWRLMT(12):
+         *brand_pre = "AMD Turion(tm) 64 X2 Mobile Technology";
+         sprintf(proc, "Processor TL-%02d", YY);
+         break;
+      case PKGTYPE(0) + CMPCAP(1) + BTI(3) + PWRLMT(4):
+      case PKGTYPE(0) + CMPCAP(1) + BTI(3) + PWRLMT(12):
+         *brand_pre = "AMD Turion(tm) 64 X2 Dual-Core";
+         sprintf(proc, "Processor TK-%02d", YY);
+         break;
+      case PKGTYPE(0) + CMPCAP(1) + BTI(5) + PWRLMT(4):
+         *brand_pre = "AMD Turion(tm) 64 X2 Dual Core";
+         sprintf(proc, "Processor %02d00+", TT);
+         break;
+      case PKGTYPE(0) + CMPCAP(1) + BTI(6) + PWRLMT(2):
+         *brand_pre = "AMD Turion(tm) X2 Dual Core";
+         sprintf(proc, "Processor L3%02d", RR);
+         break;
+      case PKGTYPE(0) + CMPCAP(1) + BTI(7) + PWRLMT(4):
+         *brand_pre = "AMD Turion(tm) X2 Dual Core";
+         sprintf(proc, "Processor L5%02d", RR);
+         break;
+      }
+      
+#undef RR
+#undef PP
+#undef TT
+#undef ZZ
+#undef YY
+   } else if (__F(stash->val_1_eax) == _XF(1) + _F(15)
+              || __F(stash->val_1_eax) == _XF(2) + _F(15)) {
+      /*
+      ** Algorithm from:
+      **    AMD Revision Guide for AMD Family 10h Processors (41322 Rev 3.74)
+      **    AMD Revision Guide for AMD Family 11h Processors (41788 Rev 3.08)
+      ** But using only the Processor numbers.
+      */
+      unsigned int  str1;
+      unsigned int  str2;
+      unsigned int  pg;
+      unsigned int  partialmodel;
+      unsigned int  pkgtype;
+      unsigned int  nc;
+      const char*   s1;
+      const char*   s2;
+
+      str2         = BIT_EXTRACT_LE(stash->val_80000001_ebx,  0,  4);
+      partialmodel = BIT_EXTRACT_LE(stash->val_80000001_ebx,  4, 11);
+      str1         = BIT_EXTRACT_LE(stash->val_80000001_ebx, 11, 15);
+      pg           = BIT_EXTRACT_LE(stash->val_80000001_ebx, 15, 16);
+      pkgtype      = BIT_EXTRACT_LE(stash->val_80000001_ebx, 28, 32);
+      nc           = BIT_EXTRACT_LE(stash->val_80000008_ecx,  0,  8);
+
+#define NC(nc)            ((nc)   << 9)
+#define PG(pg)            ((pg)   << 8)
+#define STR1(str1)        ((str1) << 4)
+#define STR2(str2)        (str2)
+
+      /* 
+      ** In every String2 Values table, there were special cases for
+      ** pg == 0 && str2 == 15 which defined them as a the empty string.
+      ** But that produces the same result as an undefined string, so
+      ** don't bother trying to handle them.
+      */
+      if (__F(stash->val_1_eax) == _XF(1) + _F(15)) {
+         if (pkgtype >= 2) {
+            partialmodel--;
+         }
+
+         /* Family 10h tables */
+         switch (pkgtype) {
+         case 0:
+            /* 41322 3.74: table 14: String1 Values for Fr2, Fr5, and Fr6 (1207) Processors */
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(3) + STR1(0): *brand_pre = "Quad-Core AMD Opteron(tm)"; s1 = "Processor 83"; break;
+            case PG(0) + NC(3) + STR1(1): *brand_pre = "Quad-Core AMD Opteron(tm)"; s1 = "Processor 23"; break;
+            case PG(0) + NC(5) + STR1(0): *brand_pre = "Six-Core AMD Opteron(tm)";  s1 = "Processor 84"; break;
+            case PG(0) + NC(5) + STR1(1): *brand_pre = "Six-Core AMD Opteron(tm)";  s1 = "Processor 24"; break;
+            case PG(1) + NC(3) + STR1(1): *brand_pre = "Embedded AMD Opteron(tm)";  s1 = "Processor ";   break;
+            default:                                                                s1 = NULL;           break;
+            }
+            /* 41322 3.74: table 15: String2 Values for Fr2, Fr5, and Fr6 (1207) Processors */
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(3) + STR2(10): s2 = " SE";   break;
+            case PG(0) + NC(3) + STR2(11): s2 = " HE";   break;
+            case PG(0) + NC(3) + STR2(12): s2 = " EE";   break;
+            case PG(0) + NC(5) + STR2(0):  s2 = " SE";   break;
+            case PG(0) + NC(5) + STR2(1):  s2 = " HE";   break;
+            case PG(0) + NC(5) + STR2(2):  s2 = " EE";   break;
+            case PG(1) + NC(3) + STR2(1):  s2 = "GF HE"; break;
+            case PG(1) + NC(3) + STR2(2):  s2 = "HF HE"; break;
+            case PG(1) + NC(3) + STR2(3):  s2 = "VS";    break;
+            case PG(1) + NC(3) + STR2(4):  s2 = "QS HE"; break;
+            case PG(1) + NC(3) + STR2(5):  s2 = "NP HE"; break;
+            case PG(1) + NC(3) + STR2(6):  s2 = "KH HE"; break;
+            case PG(1) + NC(3) + STR2(7):  s2 = "KS HE"; break;
+            default:                       s2 = NULL;    break;
+            }
+            break;
+         case 1:
+            /* 41322 3.74: table 16: String1 Values for AM2r2 and AM3 Processors */
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(0) + STR1(2):  *brand_pre = "AMD Sempron(tm)";           s1 = "1";
+            /* This case obviously collides with one later */
+            /* case PG(0) + NC(0) + STR1(3): *brand_pre = "AMD Athlon(tm) II";         s1 = "AMD Athlon(tm) II 1"; */
+            case PG(0) + NC(0) + STR1(1):  *brand_pre = "AMD Athlon(tm)";            s1 = "";             break;
+            case PG(0) + NC(0) + STR1(3):  *brand_pre = "AMD Athlon(tm) II X2";      s1 = "2";            break;
+            case PG(0) + NC(0) + STR1(4):  *brand_pre = "AMD Athlon(tm) II X2";      s1 = "B";            break;
+            case PG(0) + NC(0) + STR1(5):  *brand_pre = "AMD Athlon(tm) II X2";      s1 = "";             break;
+            case PG(0) + NC(0) + STR1(7):  *brand_pre = "AMD Phenom(tm) II X2";      s1 = "5";            break;
+            case PG(0) + NC(0) + STR1(10): *brand_pre = "AMD Phenom(tm) II X2";      s1 = "";             break;
+            case PG(0) + NC(0) + STR1(11): *brand_pre = "AMD Phenom(tm) II X2";      s1 = "B";            break;
+            case PG(0) + NC(0) + STR1(12): *brand_pre = "AMD Sempron(tm) X2";        s1 = "1";            break;
+            case PG(0) + NC(2) + STR1(0):  *brand_pre = "AMD Phenom(tm)";            s1 = "";             break;
+            case PG(0) + NC(2) + STR1(3):  *brand_pre = "AMD Phenom(tm) II X3";      s1 = "B";            break;
+            case PG(0) + NC(2) + STR1(4):  *brand_pre = "AMD Phenom(tm) II X3";      s1 = "";             break;
+            case PG(0) + NC(2) + STR1(7):  *brand_pre = "AMD Phenom(tm) II X3";      s1 = "4";            break;
+            case PG(0) + NC(2) + STR1(8):  *brand_pre = "AMD Phenom(tm) II X3";      s1 = "7";            break;
+            case PG(0) + NC(2) + STR1(10): *brand_pre = "AMD Phenom(tm) II X3";      s1 = "";             break;
+            case PG(0) + NC(3) + STR1(0):  *brand_pre = "Quad-Core AMD Opteron(tm)"; s1 = "Processor 13"; break;
+            case PG(0) + NC(3) + STR1(2):  *brand_pre = "AMD Phenom(tm)";            s1 = "";             break;
+            case PG(0) + NC(3) + STR1(3):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "9";            break;
+            case PG(0) + NC(3) + STR1(4):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "8";            break;
+            case PG(0) + NC(3) + STR1(7):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "B";            break;
+            case PG(0) + NC(3) + STR1(8):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "";             break;
+            case PG(0) + NC(3) + STR1(10): *brand_pre = "AMD Athlon(tm) II X4";      s1 = "6";            break;
+            case PG(0) + NC(3) + STR1(15): *brand_pre = "AMD Athlon(tm) II X4";      s1 = "";             break;
+            case PG(0) + NC(5) + STR1(0):  *brand_pre = "AMD Phenom(tm) II X6";      s1 = "1";            break;
+            case PG(1) + NC(3) + STR1(2):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "9";            break;
+            case PG(1) + NC(3) + STR1(3):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "8";            break;
+            default:                                                                 s1 = NULL;           break;
+            }
+            /* 41322 3.74: table 17: String2 Values for AM2r2 and AM3 Processors */
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(0) + STR2(10): s2 = " Processor";                break;
+            case PG(0) + NC(0) + STR2(11): s2 = "u Processor";               break;
+            case PG(0) + NC(1) + STR2(3):  s2 = "50 Dual-Core Processor";    break;
+            case PG(0) + NC(1) + STR2(6):  s2 = " Processor";                break;
+            case PG(0) + NC(1) + STR2(7):  s2 = "e Processor";               break;
+            case PG(0) + NC(1) + STR2(9):  s2 = "0 Processor";               break;
+            case PG(0) + NC(1) + STR2(10): s2 = "0e Processor";              break;
+            case PG(0) + NC(1) + STR2(11): s2 = "u Processor";               break;
+            case PG(0) + NC(2) + STR2(0):  s2 = "00 Triple-Core Processor";  break;
+            case PG(0) + NC(2) + STR2(1):  s2 = "00e Triple-Core Processor"; break;
+            case PG(0) + NC(2) + STR2(2):  s2 = "00B Triple-Core Processor"; break;
+            case PG(0) + NC(2) + STR2(3):  s2 = "50 Triple-Core Processor";  break;
+            case PG(0) + NC(2) + STR2(4):  s2 = "50e Triple-Core Processor"; break;
+            case PG(0) + NC(2) + STR2(5):  s2 = "50B Triple-Core Processor"; break;
+            case PG(0) + NC(2) + STR2(6):  s2 = " Processor";                break;
+            case PG(0) + NC(2) + STR2(7):  s2 = "e Processor";               break;
+            case PG(0) + NC(2) + STR2(9):  s2 = "0e Processor";              break;
+            case PG(0) + NC(2) + STR2(10): s2 = "0 Processor";               break;
+            case PG(0) + NC(3) + STR2(0):  s2 = "00 Quad-Core Processor";    break;
+            case PG(0) + NC(3) + STR2(1):  s2 = "00e Quad-Core Processor";   break;
+            case PG(0) + NC(3) + STR2(2):  s2 = "00B Quad-Core Processor";   break;
+            case PG(0) + NC(3) + STR2(3):  s2 = "50 Quad-Core Processor";    break;
+            case PG(0) + NC(3) + STR2(4):  s2 = "50e Quad-Core Processor";   break;
+            case PG(0) + NC(3) + STR2(5):  s2 = "50B Quad-Core Processor";   break;
+            case PG(0) + NC(3) + STR2(6):  s2 = " Processor";                break;
+            case PG(0) + NC(3) + STR2(7):  s2 = "e Processor";               break;
+            case PG(0) + NC(3) + STR2(9):  s2 = "0e Processor";              break;
+            case PG(0) + NC(3) + STR2(14): s2 = "0 Processor";               break;
+            case PG(0) + NC(5) + STR2(0):  s2 = "5T Processor";              break;
+            case PG(0) + NC(5) + STR2(1):  s2 = "0T Processor";              break;
+            case PG(1) + NC(3) + STR2(4):  s2 = "T Processor";               break;
+            default:                       s2 = NULL;                        break;
+            }
+            break;
+         case 2:
+            /* 41322 3.74: table 18: String1 Values for S1g3 and S1g4 Processors */
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(0) + STR1(0): *brand_pre = "AMD Sempron(tm)";                          s1 = "M1"; break;
+            case PG(0) + NC(0) + STR1(1): *brand_pre = "AMD";                                      s1 = "V";  break;
+            case PG(0) + NC(1) + STR1(0): *brand_pre = "AMD Turion(tm) II Ultra Dual-Core Mobile"; s1 = "M6"; break;
+            case PG(0) + NC(1) + STR1(1): *brand_pre = "AMD Turion(tm) II Dual-Core Mobile";       s1 = "M5"; break;
+            case PG(0) + NC(1) + STR1(2): *brand_pre = "AMD Athlon(tm) II Dual-Core";              s1 = "M3"; break;
+            case PG(0) + NC(1) + STR1(3): *brand_pre = "AMD Turion(tm) II";                        s1 = "P";  break;
+            case PG(0) + NC(1) + STR1(4): *brand_pre = "AMD Athlon(tm) II";                        s1 = "P";  break;
+            case PG(0) + NC(1) + STR1(5): *brand_pre = "AMD Phenom(tm) II";                        s1 = "X";  break;
+            case PG(0) + NC(1) + STR1(6): *brand_pre = "AMD Phenom(tm) II";                        s1 = "N";  break;
+            case PG(0) + NC(1) + STR1(7): *brand_pre = "AMD Turion(tm) II";                        s1 = "N";  break;
+            case PG(0) + NC(1) + STR1(8): *brand_pre = "AMD Athlon(tm) II";                        s1 = "N";  break;
+            case PG(0) + NC(2) + STR1(2): *brand_pre = "AMD Phenom(tm) II";                        s1 = "P";  break;
+            case PG(0) + NC(2) + STR1(3): *brand_pre = "AMD Phenom(tm) II";                        s1 = "N";  break;
+            case PG(0) + NC(3) + STR1(1): *brand_pre = "AMD Phenom(tm) II";                        s1 = "P";  break;
+            case PG(0) + NC(3) + STR1(2): *brand_pre = "AMD Phenom(tm) II";                        s1 = "X";  break;
+            case PG(0) + NC(3) + STR1(3): *brand_pre = "AMD Phenom(tm) II";                        s1 = "N";  break;
+            default:                                                                               s1 = NULL; break;
+            }
+            /* 41322 3.74: table 19: String1 Values for S1g3 and S1g4 Processors */
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(0) + STR2(1): s2 = "0 Processor";             break;
+            case PG(0) + NC(1) + STR2(2): s2 = "0 Dual-Core Processor";   break;
+            case PG(0) + NC(2) + STR2(2): s2 = "0 Triple-Core Processor"; break;
+            case PG(0) + NC(3) + STR2(1): s2 = "0 Quad-Core Processor";   break;
+            default:                      s2 = NULL;                      break;
+            }
+            break;
+         case 3:
+            /* 41322 3.74: table 20: String1 Values for G34r1 Processors */
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(7)  + STR1(0): *brand_pre = "AMD Opteron(tm)"; s1 = "Processor 61"; break;
+            case PG(0) + NC(11) + STR1(0): *brand_pre = "AMD Opteron(tm)"; s1 = "Processor 61"; break;
+            /* It sure is odd that there are no 0/7/1 or 0/11/1 cases here. */
+            default:                                                       s1 = NULL;           break;
+            }
+            /* 41322 3.74: table 21: String2 Values for G34r1 Processors */
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(7)  + STR1(0): s2 = " HE"; break;
+            case PG(0) + NC(7)  + STR1(1): s2 = " SE"; break;
+            case PG(0) + NC(11) + STR1(0): s2 = " HE"; break;
+            case PG(0) + NC(11) + STR1(1): s2 = " SE"; break;
+            default:                       s2 = NULL;  break;
+            }
+            break;
+         case 4:
+            /* 41322 3.74: table 22: String1 Values for ASB2 Processors */
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(0) + STR1(1): *brand_pre = "AMD Athlon(tm) II Neo"; s1 = "K";  break;
+            case PG(0) + NC(0) + STR1(2): *brand_pre = "AMD";                   s1 = "V";  break;
+            case PG(0) + NC(0) + STR1(3): *brand_pre = "AMD Athlon(tm) II Neo"; s1 = "R";  break;
+            case PG(0) + NC(1) + STR1(1): *brand_pre = "AMD Turion(tm) II Neo"; s1 = "K";  break;
+            case PG(0) + NC(1) + STR1(2): *brand_pre = "AMD Athlon(tm) II Neo"; s1 = "K";  break;
+            case PG(0) + NC(1) + STR1(3): *brand_pre = "AMD";                   s1 = "V";  break;
+            case PG(0) + NC(1) + STR1(4): *brand_pre = "AMD Turion(tm) II Neo"; s1 = "N";  break;
+            case PG(0) + NC(1) + STR1(5): *brand_pre = "AMD Athlon(tm) II Neo"; s1 = "N";  break;
+            default:                                                            s1 = NULL; break;
+            }
+            /* 41322 3.74: table 23: String2 Values for ASB2 Processors */
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(0)  + STR1(1): s2 = "5 Processor";           break;
+            case PG(0) + NC(0)  + STR1(2): s2 = "L Processor";           break;
+            case PG(0) + NC(1)  + STR1(1): s2 = "5 Dual-Core Processor"; break;
+            case PG(0) + NC(1)  + STR1(2): s2 = "L Dual-Core Processor"; break;
+            default:                       s2 = NULL;                    break;
+            }
+            break;
+         case 5:
+            /* 41322 3.74: table 24: String1 Values for C32r1 Processors */
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(3) + STR1(0): *brand_pre = "AMD Opteron(tm)"; s1 = "41"; break;
+            case PG(0) + NC(5) + STR1(0): *brand_pre = "AMD Opteron(tm)"; s1 = "41"; break;
+            /* It sure is odd that there are no 0/3/1 or 0/5/1 cases here. */
+            default:                                                      s1 = NULL; break;
+            }
+            /* 41322 3.74: table 25: String2 Values for C32r1 Processors */
+            /* 41322 3.74: table 25 */
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(3) + STR1(0): s2 = " HE"; break;
+            case PG(0) + NC(3) + STR1(1): s2 = " EE"; break;
+            case PG(0) + NC(5) + STR1(0): s2 = " HE"; break;
+            case PG(0) + NC(5) + STR1(1): s2 = " EE"; break;
+            default:                      s2 = NULL;  break;
+            }
+            break;
+         default:
+            s1 = NULL;
+            s2 = NULL;
+            break;
+         }
+      } else if (__F(stash->val_1_eax) == _XF(2) + _F(15)) {
+         /* Family 10h tables */
+         switch (pkgtype) {
+         case 2:
+            /* 41788 3.08: table 3: String1 Values for S1g2 Processors */
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(0) + STR1(0): *brand_pre = "AMD Sempron(tm)";                          s1 = "SI-"; break;
+            case PG(0) + NC(0) + STR1(1): *brand_pre = "AMD Athlon(tm)";                           s1 = "QI-"; break;
+            case PG(0) + NC(1) + STR1(0): *brand_pre = "AMD Turion(tm) X2 Ultra Dual-Core Mobile"; s1 = "ZM-"; break;
+            case PG(0) + NC(1) + STR1(1): *brand_pre = "AMD Turion(tm) X2 Dual-Core Mobile";       s1 = "RM-"; break;
+            case PG(0) + NC(1) + STR1(2): *brand_pre = "AMD Athlon(tm) X2 Dual-Core";              s1 = "QL-"; break;
+            case PG(0) + NC(1) + STR1(3): *brand_pre = "AMD Sempron(tm) X2 Dual-Core";             s1 = "NI-"; break;
+            default:                                                                               s1 = NULL;  break;
+            }
+            /* 41788 3.08: table 4: String2 Values for S1g2 Processors */
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(0) + STR2(0): s2 = "";   break;
+            case PG(0) + NC(1) + STR2(0): s2 = "";   break;
+            default:                      s2 = NULL; break;
+            }
+            break;
+         default:
+            s1 = NULL;
+            s2 = NULL;
+            break;
+         }
+      } else {
+         s1 = NULL;
+         s2 = NULL;
+      }
+
+#undef NC
+#undef PG
+#undef STR1
+#undef STR2
+
+      if (s1 != NULL) {
+         char*  p = proc;
+         p += sprintf(p, "%s%02d", s1, partialmodel);
+         if (s2) sprintf(p, "%s", s2);
+      }
+   } else if (__F(stash->val_1_eax) == _XF(5) + _F(15)) {
+      /*
+      ** Algorithm from:
+      **    AMD Revision Guide for AMD Family 14h Models 00h-0Fh Processors
+      **    (47534 Rev 3.00)
+      ** But using only the Processor numbers.
+      */
+      unsigned int  str1;
+      unsigned int  str2;
+      unsigned int  pg;
+      unsigned int  partialmodel;
+      unsigned int  pkgtype;
+      unsigned int  nc;
+      const char*   s1;
+      const char*   s2;
+
+      str2         = BIT_EXTRACT_LE(stash->val_80000001_ebx,  0,  4);
+      partialmodel = BIT_EXTRACT_LE(stash->val_80000001_ebx,  4, 11);
+      str1         = BIT_EXTRACT_LE(stash->val_80000001_ebx, 11, 15);
+      pg           = BIT_EXTRACT_LE(stash->val_80000001_ebx, 15, 16);
+      pkgtype      = BIT_EXTRACT_LE(stash->val_80000001_ebx, 28, 32);
+      nc           = BIT_EXTRACT_LE(stash->val_80000008_ecx,  0,  8);
+
+#define NC(nc)            ((nc)   << 9)
+#define PG(pg)            ((pg)   << 8)
+#define STR1(str1)        ((str1) << 4)
+#define STR2(str2)        (str2)
+
+      partialmodel--;
+
+      switch (pkgtype) {
+      case 0:
+            /* 47534 3.00: table 4: String1 Values for FT1 Processors */
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(0) + STR1(1): *brand_pre = "AMD"; s1 = "C-";  break;
+            case PG(0) + NC(0) + STR1(2): *brand_pre = "AMD"; s1 = "E-";  break;
+            case PG(0) + NC(0) + STR1(4): *brand_pre = "AMD"; s1 = "G-T"; break;
+            case PG(0) + NC(1) + STR1(1): *brand_pre = "AMD"; s1 = "C-";  break;
+            case PG(0) + NC(1) + STR1(2): *brand_pre = "AMD"; s1 = "E-";  break;
+            case PG(0) + NC(1) + STR1(4): *brand_pre = "AMD"; s1 = "G-T"; break;
+            default:                                          s1 = NULL;  break;
+            }
+            /* 47534 3.00: table 5: String2 Values for FT1 Processors */
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(0) + STR2(1): s2 = "";   break;
+            case PG(0) + NC(0) + STR2(2): s2 = "0";  break;
+            case PG(0) + NC(0) + STR2(3): s2 = "5";  break;
+            case PG(0) + NC(0) + STR2(4): s2 = "0x"; break;
+            case PG(0) + NC(0) + STR2(5): s2 = "5x"; break;
+            case PG(0) + NC(0) + STR2(6): s2 = "x";  break;
+            case PG(0) + NC(0) + STR2(7): s2 = "L";  break;
+            case PG(0) + NC(0) + STR2(8): s2 = "N";  break;
+            case PG(0) + NC(0) + STR2(9): s2 = "R";  break;
+            case PG(0) + NC(1) + STR2(1): s2 = "";   break;
+            case PG(0) + NC(1) + STR2(2): s2 = "0";  break;
+            case PG(0) + NC(1) + STR2(3): s2 = "5";  break;
+            case PG(0) + NC(1) + STR2(4): s2 = "0x"; break;
+            case PG(0) + NC(1) + STR2(5): s2 = "5x"; break;
+            case PG(0) + NC(1) + STR2(6): s2 = "x";  break;
+            case PG(0) + NC(1) + STR2(7): s2 = "L";  break;
+            case PG(0) + NC(1) + STR2(8): s2 = "N";  break;
+            default:                      s2 = NULL; break;
+            }
+            break;
+         break;
+      default:
+         s1 = NULL;
+         s2 = NULL;
+         break;
+      }
+
+      if (s1 != NULL) {
+         char*  p = proc;
+         p += sprintf(p, "%s%02d", s1, partialmodel);
+         if (s2) sprintf(p, "%s", s2);
+      }
+   }
+}
+
+static void
+decode_override_brand(code_stash_t*  stash)
+{
+   if (stash->vendor == VENDOR_AMD
+       && strstr(stash->brand, "model unknown") != NULL) {
+      /*
+      ** AMD has this exotic architecture where the BIOS decodes the brand
+      ** string from tables and feeds it back into the CPU via MSR's.  If an old
+      ** BIOS cannot understand a new CPU, it uses the string "model unknown".
+      ** In this case, I use my own copies of tables to deduce the brand string
+      ** and decode that.
+      */
+      const char*  brand_pre;
+      const char*  brand_post;
+      char         proc[96];
+      decode_amd_model(stash, &brand_pre, &brand_post, proc);
+      if (brand_pre != NULL) {
+         char*  b = stash->override_brand;
+         b += sprintf(b, "%s %s", brand_pre, proc);
+         if (brand_post != NULL) sprintf(b, " %s", brand_post);
+      }
+   }
+}
+
+static void
+print_override_brand(code_stash_t*  stash)
+{
+   if (stash->override_brand[0] != '\0') {
+      printf("   (override brand synth) = %s\n", stash->override_brand);
+   }
+}
 
 static void
 stash_intel_cache(code_stash_t*  stash,
@@ -322,7 +1159,8 @@ stash_intel_cache(code_stash_t*  stash,
    case 0x43: stash->L2_4w_512K   = TRUE; break;
    case 0x44: stash->L2_4w_1Mor2M = TRUE; break;
    case 0x45: stash->L2_4w_1Mor2M = TRUE; break;
-   case 0x80: stash->L2_8w_512K   = TRUE; break; // MS
+   case 0x76: stash->L2_4w_1Mor2M = TRUE; break;
+   case 0x80: stash->L2_8w_512K   = TRUE; break;
    case 0x82: stash->L2_8w_256K   = TRUE; break;
    case 0x83: stash->L2_8w_512K   = TRUE; break;
    case 0x84: stash->L2_8w_1Mor2M = TRUE; break;
@@ -455,15 +1293,13 @@ decode_brand_id_stash(code_stash_t*  stash)
 }
 
 static void
-decode_brand_stash(code_stash_t*  stash)
+decode_brand_string(const char*    brand,
+                    code_stash_t*  stash)
 {
-   const char*  brand = stash->brand;
-
    stash->br.mobile      = (strstr(brand, "Mobile") != NULL
                             || strstr(brand, "mobile") != NULL);
 
    stash->br.celeron     = strstr(brand, "Celeron") != NULL;
-   /* TODO: Is Core(TM) the right string test?  I guessed. */
    stash->br.core        = strstr(brand, "Core(TM)") != NULL;
    stash->br.pentium     = strstr(brand, "Pentium") != NULL;
    stash->br.xeon_mp     = (strstr(brand, "Xeon MP") != NULL
@@ -482,6 +1318,7 @@ decode_brand_stash(code_stash_t*  stash)
    stash->br.sempron     = strstr(brand, "Sempron") != NULL;
    stash->br.phenom      = strstr(brand, "Phenom") != NULL;
    stash->br.v_series    = strstr(brand, "V-Series") != NULL;
+   stash->br.geode       = strstr(brand, "Geode") != NULL;
    stash->br.turion      = strstr(brand, "Turion") != NULL;
    stash->br.neo         = strstr(brand, "Neo") != NULL;
    stash->br.athlon_fx   = strstr(brand, "Athlon(tm) 64 FX") != NULL;
@@ -504,6 +1341,16 @@ decode_brand_stash(code_stash_t*  stash)
       stash->br.cores = 6;
    } else {
       stash->br.cores = 0; // means unspecified by the brand string
+   }
+}
+
+static void
+decode_brand_stash(code_stash_t*  stash)
+{
+   if (stash->override_brand[0] != '\0') {
+      decode_brand_string(stash->override_brand, stash);
+   } else {
+      decode_brand_string(stash->brand, stash);
    }
 }
 
@@ -633,6 +1480,7 @@ decode_brand_stash(code_stash_t*  stash)
 #define MS (is_amd && is_mobile && stash->br.sempron)
 #define Mp (is_amd && is_mobile && stash->br.phenom)
 #define MV (is_amd && is_mobile && stash->br.v_series)
+#define MG (is_amd && stash->br.geode)
 #define MT (is_amd && stash->br.turion)
 #define Mn (is_amd && stash->br.turion && stash->br.neo)
 #define MN (is_amd && stash->br.neo)
@@ -642,6 +1490,14 @@ decode_brand_stash(code_stash_t*  stash)
 */
 static boolean is_amd_egypt_athens_8xx(const code_stash_t*  stash)
 {
+   /*
+   ** This makes its determination based on the Processor model
+   ** logic from:
+   **    Revision Guide for AMD Athlon 64 and AMD Opteron Processors 
+   **    (25759 Rev 3.79), Constructing the Processor Name String.
+   ** See also decode_amd_model().
+   */
+
    if (stash->vendor == VENDOR_AMD && stash->br.opteron) {
       switch (__FM(stash->val_1_eax)) {
       case _FM(0,15, 2,1): /* Italy/Egypt */
@@ -651,8 +1507,8 @@ static boolean is_amd_egypt_athens_8xx(const code_stash_t*  stash)
 
             if (__B(stash->val_1_ebx) != 0) {
                bti = BIT_EXTRACT_LE(__B(stash->val_1_ebx), 5, 8) << 2;
-            } else if (__XB(stash->val_80000001_ebx) != 0) {
-               bti = BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 6, 12);
+            } else if (BIT_EXTRACT_LE(stash->val_80000001_ebx, 0, 12) != 0) {
+               bti = BIT_EXTRACT_LE(stash->val_80000001_ebx, 6, 12);
             } else {
                return FALSE;
             }
@@ -733,11 +1589,11 @@ static boolean is_amd_egypt_athens_8xx(const code_stash_t*  stash)
                      && (stash->transmeta_proc_rev & 0xffff0000) == rev)
 /* TODO: Add cases for Transmeta Crusoe TM5700/TM5900 */
 /* TODO: Add cases for Transmeta Efficeon */
-#define t2 (tm_rev(01010000))
-#define t4 (tm_rev(01020000) || (tm_rev(01030000) && stash->L2_4w_256K))
-#define t5 ((tm_rev(01040000) || tm_rev(01040000)) && stash->L2_4w_256K)
-#define t6 (tm_rev(01030000) && stash->L2_4w_512K)
-#define t8 ((tm_rev(01040000) || tm_rev(01040000)) && stash->L2_4w_512K)
+#define t2 (tm_rev(0x01010000))
+#define t4 (tm_rev(0x01020000) || (tm_rev(0x01030000) && stash->L2_4w_256K))
+#define t5 ((tm_rev(0x01040000) || tm_rev(0x01040000)) && stash->L2_4w_256K)
+#define t6 (tm_rev(0x01030000) && stash->L2_4w_512K)
+#define t8 ((tm_rev(0x01040000) || tm_rev(0x01040000)) && stash->L2_4w_512K)
 
 static void
 debug_queries(const code_stash_t*  stash)
@@ -1034,8 +1890,8 @@ print_synth_intel(const char*          name,
    FMSQ(    0, 6,  0,15, 13, Qc, "Intel Core 2 Quad (Conroe M0), 65nm");
    FMSQ(    0, 6,  0,15, 13, dc, "Intel Core 2 Duo (Conroe M0), 65nm");
    FMSQ(    0, 6,  0,15, 13, dP, "Intel Pentium Dual-Core Desktop Processor E2000 (Allendale M0), 65nm");
-   FMSQ(    0, 6,  0,15, 13, dC, "Intel Celeron Dual-Core E1000 (Allendale M0)");
-   FMS (    0, 6,  0,15, 13,     "Intel Core 2 Duo (Conroe M0) / Core 2 Duo Mobile (Merom M1) / Celeron Processor 500 (Merom E1) / Pentium Dual-Core Desktop Processor E2000 (Allendale M0) / Celeron Dual-Core E1000 (Allendale M0)");
+   FMSQ(    0, 6,  0,15, 13, dC, "Intel Celeron Dual-Core E1000 (Allendale M0) / Celeron Dual-Core T1000 (Merom M0)");
+   FMS (    0, 6,  0,15, 13,     "Intel Core 2 Duo (Conroe M0) / Core 2 Duo Mobile (Merom M1) / Celeron Processor 500 (Merom E1) / Pentium Dual-Core Desktop Processor E2000 (Allendale M0) / Celeron Dual-Core E1000 (Allendale M0) / Celeron Dual-Core T1000 (Merom M0)");
    FMQ (    0, 6,  0,15,     sQ, "Intel Quad-Core Xeon (Woodcrest), 65nm");
    FMQ (    0, 6,  0,15,     sX, "Intel Dual-Core Xeon (Conroe / Woodcrest) / Quad-Core Xeon (Kentsfield / Clovertown) / Core 2 Extreme Quad-Core (Clovertown) / Xeon (Tigerton G0), 65nm");
    FMQ (    0, 6,  0,15,     Xc, "Intel Core 2 Extreme Processor (Conroe) / Core 2 Extreme Quad-Core (Kentsfield), 65nm");
@@ -1045,6 +1901,7 @@ print_synth_intel(const char*          name,
    FMQ (    0, 6,  0,15,     dP, "Intel Pentium Dual-Core (Allendale), 65nm");
    FMQ (    0, 6,  0,15,     dC, "Intel Celeron M (Conroe) / Celeron (Merom) / Celeron Dual-Core (Allendale), 65nm");
    FM  (    0, 6,  0,15,         "Intel Core Duo / Core 2 Duo (Conroe / Allendale) / Core Duo Mobile (Merom) / Core 2 Duo Mobile (Merom) / Celeron (Merom) / Core 2 Extreme (Conroe) / Core 2 Extreme Quad-Core (Kentsfield) / Pentium Dual-Core (Allendale) / Celeron M (Conroe) / Celeron (Merom) / Celeron Dual-Core (Allendale) / Quad-Core Xeon (Kentsfield / Clovertown / Woodcrest) / Core 2 Extreme Quad-Core (Clovertown) / Xeon (Tigerton) / Dual-Core Xeon (Conroe / Woodcrest), 65nm");
+   FMS (    0, 6,  1, 5,  0,     "Intel EP80579 (Tolapai B0)");
    FMSQ(    0, 6,  1, 6,  1, MC, "Intel Celeron Processor 200/400/500 (Conroe-L/Merom-L A1), 65nm");
    FMSQ(    0, 6,  1, 6,  1, dC, "Intel Celeron M (Merom-L A1), 65nm");
    FMSQ(    0, 6,  1, 6,  1, Mc, "Intel Core 2 Duo Mobile (Merom A1), 65nm");
@@ -1098,7 +1955,7 @@ print_synth_intel(const char*          name,
    FM  (    0, 6,  1,10,         "Intel Core (Bloomfield) / Xeon (Bloomfield / Gainestown), 45nm");
    FMS (    0, 6,  1,12,  1,     "Intel Atom N270 (Diamondville B0), 45nm");
    FMS (    0, 6,  1,12,  2,     "Intel Atom 200/N200/300 (Diamondville C0) / Atom Z500 (Silverthorne C0), 45nm");
-   FMS (    0, 6,  1,12, 10,     "Intel Atom D400/N400 (Pineview A0) / Atom D500 (Pineview B0), 45nm");
+   FMS (    0, 6,  1,12, 10,     "Intel Atom D400/N400 (Pineview A0) / Atom D500/N500 (Pineview B0), 45nm");
    FM  (    0, 6,  1,12,         "Intel Atom (Diamondville / Silverthorne / Pineview), 45nm");
    FMS (    0, 6,  1,13,  1,     "Intel Xeon Processor 7400 (Dunnington A1), 45nm");
    FM  (    0, 6,  1,13,         "Intel Xeon (Dunnington), 45nm");
@@ -1115,20 +1972,32 @@ print_synth_intel(const char*          name,
    FMQ (    0, 6,  1,14,     dc, "Intel Core (Lynnfield), 45nm");
    FM  (    0, 6,  1,14,         "Intel Intel Core (Lynnfield) / Core Mobile (Clarksfield) / Xeon (Lynnfield) / Xeon (Jasper Forest), 45nm");
    FMSQ(    0, 6,  2, 5,  2, sX, "Intel Xeon Processor L3406 (Clarkdale C2), 32nm");
+   FMSQ(    0, 6,  2, 5,  2, MC, "Intel Celeron Mobile P4500 (Arrandale C2), 32nm");
    FMSQ(    0, 6,  2, 5,  2, MP, "Intel Pentium P6000 Mobile (Arrandale C2), 32nm");
-   FMSQ(    0, 6,  2, 5,  2, dP, "Intel Pentium G6950 (Clarkdale C2), 32nm");
+   FMSQ(    0, 6,  2, 5,  2, dP, "Intel Pentium G6900 / P4505 (Clarkdale C2), 32nm");
    FMSQ(    0, 6,  2, 5,  2, Mc, "Intel Core i3-300 Mobile / Core i5-400 Mobile / Core i5-500 Mobile / Core i7-600 Mobile (Arrandale C2), 32nm");
-   FMSQ(    0, 6,  2, 5,  2, dc, "Intel Core i3-500 / i5-600 (Clarkdale C2), 32nm");
-   FMS (    0, 6,  2, 5,  2,     "Intel Core i3-500 / i5-600 (Clarkdale C2) / Core i3-300 Mobile / Core i5-400 Mobile / Core i5-500 Mobile / Core i7-600 Mobile (Arrandale C2) / Pentium P6000 Mobile (Arrandale C2) / Xeon Processor L3406 (Clarkdale C2), 32nm");
-   FMSQ(    0, 6,  2, 5,  5, MP, "Intel Pentium U5400 Mobile (Arrandale K0), 32nm");
-   FMSQ(    0, 6,  2, 5,  5, dc, "Intel Core i3-500 / i5-600 (Clarkdale K0), 32nm");
-   FMS (    0, 6,  2, 5,  5,     "Intel Core i3-500 / i5-600 (Clarkdale K0) / Pentium U5400 Mobile (Arrandale K0), 32nm");
+   FMSQ(    0, 6,  2, 5,  2, dc, "Intel Core i3-300 / i3-500 / i5-500 / i5-600 / i7-600 (Clarkdale C2), 32nm");
+   FMS (    0, 6,  2, 5,  2,     "Intel Core i3 / i5 / i7 (Clarkdale C2) / Core i3 Mobile / Core i5 Mobile / Core i7 Mobile (Arrandale C2) / Pentium P6000 Mobile (Arrandale C2) / Celeron Mobile P4500 (Arrandale C2) / Xeon Processor L3406 (Clarkdale C2), 32nm");
+   FMSQ(    0, 6,  2, 5,  5, MC, "Intel Celeron Celeron Mobile U3400 (Arrandale K0) / Celeron Mobile P4600 (Arrandale K0), 32nm");
+   FMSQ(    0, 6,  2, 5,  5, MP, "Intel Pentium U5000 Mobile (Arrandale K0), 32nm");
+   FMSQ(    0, 6,  2, 5,  2, dP, "Intel Pentium P4505 / U3405 (Clarkdale K0), 32nm");
+   FMSQ(    0, 6,  2, 5,  5, dc, "Intel Core i3-300 / i3-500 / i5-400 / i5-500 / i5-600 / i7-600 (Clarkdale K0), 32nm");
+   FMS (    0, 6,  2, 5,  5,     "Intel Core i3 / i5 / i7  (Clarkdale K0) / Pentium U5000 Mobile / Pentium P4505 / U3405 / Celeron Mobile P4000 / U3000 (Arrandale K0), 32nm");
    FMQ (    0, 6,  2, 5,     sX, "Intel Xeon Processor L3406 (Clarkdale), 32nm");
+   FMQ (    0, 6,  2, 5,     MC, "Intel Celeron Mobile (Arrandale), 32nm");
    FMQ (    0, 6,  2, 5,     MP, "Intel Pentium Mobile (Arrandale), 32nm");
    FMQ (    0, 6,  2, 5,     dP, "Intel Pentium (Clarkdale), 32nm");
    FMQ (    0, 6,  2, 5,     Mc, "Intel Core Mobile (Arrandale), 32nm");
    FMQ (    0, 6,  2, 5,     dc, "Intel Core (Clarkdale), 32nm");
-   FM  (    0, 6,  2, 5,         "Intel Core (Clarkdale) / Core (Arrandale) / Pentium (Clarkdale) / Pentium Mobile (Arrandale) / Xeon (Clarkdale), 32nm");
+   FM  (    0, 6,  2, 5,         "Intel Core (Clarkdale) / Core (Arrandale) / Pentium (Clarkdale) / Pentium Mobile (Arrandale) / Celeron Mobile (Arrandale) / Xeon (Clarkdale), 32nm");
+   FMSQ(    0, 6,  2,10,  7, Xc, "Intel Mobile Core i7 Extreme (Sandy Bridge D2), 32nm");
+   FMSQ(    0, 6,  2,10,  7, Mc, "Intel Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
+   FMSQ(    0, 6,  2,10,  7, dc, "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 (Sandy Bridge D2), 32nm");
+   FMS (    0, 6,  2,10,  7,     "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
+   FMQ (    0, 6,  2,10,     Xc, "Intel Mobile Core i7 Extreme (Sandy Bridge D2), 32nm");
+   FMQ (    0, 6,  2,10,     Mc, "Intel Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
+   FMQ (    0, 6,  2,10,     dc, "Intel Core i5-2000 / Core i7-2000 (Sandy Bridge D2), 32nm");
+   FM  (    0, 6,  2,10,         "Intel Core i5-2000 / Core i7-2000 / Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
    FMSQ(    0, 6,  2,12,  2, dc, "Intel Core i7-900 / Core i7-980X (Gulftown B1), 32nm");
    FMSQ(    0, 6,  2,12,  2, sX, "Intel Xeon Processor 3600 (Westmere-EP B1) / Xeon Processor 5600 (Westmere-EP B1), 32nm");
    FMS (    0, 6,  2,12,  2,     "Intel Core i7-900 (Gulftown B1) / Core i7-980X (Gulftown B1) / Xeon Processor 3600 (Westmere-EP B1) / Xeon Processor 5600 (Westmere-EP B1), 32nm");
@@ -1139,7 +2008,7 @@ print_synth_intel(const char*          name,
    FQ  (    0, 6,            se, "Intel Xeon (unknown model)");
    FQ  (    0, 6,            MC, "Intel Mobile Celeron (unknown model)");
    FQ  (    0, 6,            dC, "Intel Celeron (unknown model)");
-   FQ  (    0, 6,            Xc, "Intel Core 2 Extreme (unknown model)");
+   FQ  (    0, 6,            Xc, "Intel Core Extreme (unknown model)");
    FQ  (    0, 6,            Mc, "Intel Mobile Core (unknown model)");
    FQ  (    0, 6,            dc, "Intel Core (unknown model)");
    FQ  (    0, 6,            MP, "Intel Mobile Pentium (unknown model)");
@@ -1290,631 +2159,6 @@ print_synth_intel(const char*          name,
 }
 
 static void
-print_synth_amd_model(const code_stash_t*  stash)
-{
-   /*
-   ** WARNING: If you change this logic, you may need to change the logic
-   **          in specialize_amd_model, too.
-   **          You may also want to update print_80000001_ebx_amd.
-   */
-
-   if (stash == NULL) return;
-
-   if (__F(stash->val_1_eax) == _XF(0) + _F(15)
-       && __M(stash->val_1_eax) < _XM(4) + _M(0)) {
-      /*
-      ** Algorithm from:
-      **    Revision Guide for AMD Athlon 64 and AMD Opteron Processors 
-      **    (25759 Rev 3.79), Constructing the Processor Name String.
-      ** But using only the Processor numbers.
-      */
-      unsigned int  bti;
-      unsigned int  NN;
-
-      if (__B(stash->val_1_ebx) != 0) {
-         bti = BIT_EXTRACT_LE(__B(stash->val_1_ebx), 5, 8) << 2;
-         NN  = BIT_EXTRACT_LE(__B(stash->val_1_ebx), 0, 5);
-      } else if (__XB(stash->val_80000001_ebx) != 0) {
-         bti = BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 6, 12);
-         NN  = BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 0,  6);
-      } else {
-         return;
-      }
-
-#define XX  (22 + NN)
-#define YY  (38 + 2*NN)
-#define ZZ  (24 + NN)
-#define TT  (24 + NN)
-#define RR  (45 + 5*NN)
-#define EE  ( 9 + NN)
-
-      switch (bti) {
-      case 0x04:
-      case 0x05:
-      case 0x08:
-      case 0x09:
-      case 0x1d:
-      case 0x1e:
-      case 0x20:
-         printf(" Processor %02d00+", XX);
-         break;
-      case 0x06:
-      case 0x24:
-         printf(" FX-%02d", ZZ);
-         break;
-      case 0x0a:
-         printf(" ML-%02d", XX);
-         break;
-      case 0x0b:
-         printf(" MT-%02d", XX);
-         break;
-      case 0x0c:
-      case 0x0d:
-         printf(" Processor 1%02d", YY);
-         break;
-      case 0x0e:
-         printf(" Processor 1%02d HE", YY);
-         break;
-      case 0x0f:
-         printf(" Processor 1%02d EE", YY);
-         break;
-      case 0x10:
-      case 0x11:
-         printf(" Processor 2%02d", YY);
-         break;
-      case 0x12:
-         printf(" Processor 2%02d HE", YY);
-         break;
-      case 0x13:
-         printf(" Processor 2%02d EE", YY);
-         break;
-      case 0x14:
-      case 0x15:
-         printf(" Processor 8%02d", YY);
-         break;
-      case 0x16:
-         printf(" Processor 8%02d HE", YY);
-         break;
-      case 0x17:
-         printf(" Processor 8%02d EE", YY);
-         break;
-      case 0x18:
-         printf(" Processor %02d00+", EE);
-      case 0x21:
-      case 0x22:
-      case 0x23:
-      case 0x26:
-         printf(" Processor %02d00+", TT);
-         break;
-      case 0x29:
-      case 0x2c:
-      case 0x2d:
-      case 0x38:
-      case 0x3b:
-         printf(" Processor 1%02d", RR);
-         break;
-      case 0x2a:
-      case 0x30:
-      case 0x31:
-      case 0x39:
-      case 0x3c:
-         printf(" Processor 2%02d", RR);
-         break;
-      case 0x2b:
-      case 0x34:
-      case 0x35:
-      case 0x3a:
-      case 0x3d:
-         printf(" Processor 8%02d", RR);
-         break;
-      case 0x2e:
-         printf(" Processor 1%02d HE", RR);
-         break;
-      case 0x2f:
-         printf(" Processor 1%02d EE", RR);
-         break;
-      case 0x32:
-         printf(" Processor 2%02d HE", RR);
-         break;
-      case 0x33:
-         printf(" Processor 2%02d EE", RR);
-         break;
-      case 0x36:
-         printf(" Processor 8%02d HE", RR);
-         break;
-      case 0x37:
-         printf(" Processor 8%02d EE", RR);
-         break;
-      }
-
-#undef XX
-#undef YY
-#undef ZZ
-#undef TT
-#undef RR
-#undef EE
-   } else if (__F(stash->val_1_eax) == _XF(0) + _F(15)
-              && __M(stash->val_1_eax) >= _XM(4) + _M(0)) {
-      /*
-      ** Algorithm from:
-      **    Revision Guide for AMD NPT Family 0Fh Processors (33610 Rev 3.46),
-      **    Constructing the Processor Name String.
-      ** But using only the Processor numbers.
-      */
-      unsigned int  bti;
-      unsigned int  pwrlmt;
-      unsigned int  NN;
-      unsigned int  pkgtype;
-      unsigned int  cmpcap;
-
-      pwrlmt  = ((BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 6, 9) << 1)
-                 + BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 14, 15));
-      bti     = BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 9, 14);
-      NN      = ((BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 15, 16) << 5)
-                 + BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 0, 5));
-      pkgtype = BIT_EXTRACT_LE(__XB(stash->val_80000001_eax), 4, 6);
-      cmpcap  = ((BIT_EXTRACT_LE(__XB(stash->val_80000008_ecx), 0, 8) > 0)
-                 ? 0x1 : 0x0);
-
-#define RR  (NN - 1)
-#define PP  (26 + NN)
-#define TT  (15 + cmpcap*10 + NN)
-#define ZZ  (57 + NN)
-#define YY  (29 + NN)
-
-#define PKGTYPE(pkgtype)  ((pkgtype) << 11)
-#define CMPCAP(cmpcap)    ((cmpcap)  <<  9)
-#define BTI(bti)          ((bti)     <<  4)
-#define PWRLMT(pwrlmt)    (pwrlmt)
-
-      switch (PKGTYPE(pkgtype) + CMPCAP(cmpcap) + BTI(bti) + PWRLMT(pwrlmt)) {
-      /* Table 7: Name String Table for F (1207) and Fr3 (1207) Processors */
-      case PKGTYPE(1) + CMPCAP(0) + BTI(1) + PWRLMT(2):
-      case PKGTYPE(1) + CMPCAP(1) + BTI(1) + PWRLMT(2):
-         printf(" Processor 22%02d EE", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(0) + PWRLMT(2) :
-         printf(" Processor 12%02d EE", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(0) + PWRLMT(6):
-         printf(" Processor 12%02d HE", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(1) + PWRLMT(6):
-         printf(" Processor 22%02d HE", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(1) + PWRLMT(10):
-         printf(" Processor 22%02d", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(1) + PWRLMT(12):
-         printf(" Processor 22%02d SE", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(4) + PWRLMT(2):
-         printf(" Processor 82%02d EE", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(4) + PWRLMT(6):
-         printf(" Processor 82%02d HE", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(4) + PWRLMT(10):
-         printf(" Processor 82%02d", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(4) + PWRLMT(12):
-         printf(" Processor 82%02d SE", RR);
-         break;
-      case PKGTYPE(1) + CMPCAP(1) + BTI(6) + PWRLMT(14):
-         printf(" FX-%02d", ZZ);
-         break;
-      /* Table 8: Name String Table for AM2 and ASB1 Processors */
-      case PKGTYPE(3) + CMPCAP(0) + BTI(1) + PWRLMT(5):
-         printf(" Processor LE-1%02d0", RR);
-         break;
-      case PKGTYPE(3) + CMPCAP(0) + BTI(2) + PWRLMT(6):
-         printf(" Processor LE-1%02d0", ZZ);
-         break;
-      case PKGTYPE(3) + CMPCAP(0) + BTI(3) + PWRLMT(6):
-         printf(" Processor 1%02d0B", ZZ);
-         break;
-      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(1):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(2):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(3):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(4):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(5):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(4) + PWRLMT(8):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(6) + PWRLMT(4):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(6) + PWRLMT(8):
-         printf(" Processor %02d00+", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(0) + BTI(5) + PWRLMT(2):
-         printf(" Processor %02d50p", RR);
-         break;
-      case PKGTYPE(3) + CMPCAP(0) + BTI(7) + PWRLMT(1):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(7) + PWRLMT(2):
-         printf(" Processor %02d0U", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(0) + BTI(8) + PWRLMT(2):
-      case PKGTYPE(3) + CMPCAP(0) + BTI(8) + PWRLMT(3):
-         printf(" Processor %02d50e", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(0) + BTI(9) + PWRLMT(2):
-         printf(" Processor MV-%02d", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(0) + BTI(12) + PWRLMT(2):
-         printf(" Processor 2%02dU", RR);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(1) + PWRLMT(6):
-         printf(" Processor 12%02d HE", RR);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(1) + PWRLMT(10):
-         printf(" Processor 12%02d", RR);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(1) + PWRLMT(12):
-         printf(" Processor 12%02d SE", RR);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(3) + PWRLMT(3):
-         printf(" Processor BE-2%02d0", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(1):
-      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(2):
-      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(6):
-      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(8):
-      case PKGTYPE(3) + CMPCAP(1) + BTI(4) + PWRLMT(12):
-         printf(" Processor %02d00+", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(5) + PWRLMT(12):
-         printf(" FX-%02d", ZZ);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(6) + PWRLMT(6):
-         printf(" Processor %02d00", RR);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(7) + PWRLMT(3):
-         printf(" Processor %02d50e", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(7) + PWRLMT(6):
-      case PKGTYPE(3) + CMPCAP(1) + BTI(7) + PWRLMT(7):
-         printf(" Processor %02d00B", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(8) + PWRLMT(3):
-         printf(" Processor %02d50B", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(9) + PWRLMT(1):
-      case PKGTYPE(3) + CMPCAP(1) + BTI(10) + PWRLMT(1):
-      case PKGTYPE(3) + CMPCAP(1) + BTI(10) + PWRLMT(2):
-         printf(" Processor %02d50e", TT);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(11) + PWRLMT(0):
-         printf(" Processor L6%02d", RR);
-         break;
-      case PKGTYPE(3) + CMPCAP(1) + BTI(12) + PWRLMT(0):
-         printf(" Processor L3%02d", RR);
-         break;
-      /* Table 9: Name String Table for S1g1 Processors */
-      case PKGTYPE(0) + CMPCAP(0) + BTI(1) + PWRLMT(2):
-      case PKGTYPE(0) + CMPCAP(0) + BTI(3) + PWRLMT(1):
-      case PKGTYPE(0) + CMPCAP(0) + BTI(4) + PWRLMT(2):
-      case PKGTYPE(0) + CMPCAP(1) + BTI(5) + PWRLMT(4):
-         printf(" Processor %02d00+", TT);
-         break;
-      case PKGTYPE(0) + CMPCAP(0) + BTI(2) + PWRLMT(12):
-         printf(" MK-%02d", YY);
-         break;
-      case PKGTYPE(0) + CMPCAP(0) + BTI(3) + PWRLMT(6):
-      case PKGTYPE(0) + CMPCAP(0) + BTI(3) + PWRLMT(12):
-         printf(" Processor %02d00+", PP);
-         break;
-      case PKGTYPE(0) + CMPCAP(0) + BTI(6) + PWRLMT(4):
-      case PKGTYPE(0) + CMPCAP(0) + BTI(6) + PWRLMT(6):
-      case PKGTYPE(0) + CMPCAP(0) + BTI(6) + PWRLMT(12):
-         printf(" Processor TF-%02d", TT);
-         break;
-      case PKGTYPE(0) + CMPCAP(0) + BTI(7) + PWRLMT(3):
-         printf(" Processor L1%02d", RR);
-         break;
-      case PKGTYPE(0) + CMPCAP(1) + BTI(1) + PWRLMT(12):
-         printf(" Processor TJ-%02d", YY);
-         break;
-      case PKGTYPE(0) + CMPCAP(1) + BTI(2) + PWRLMT(12):
-         printf(" Processor TL-%02d", YY);
-         break;
-      case PKGTYPE(0) + CMPCAP(1) + BTI(3) + PWRLMT(4):
-      case PKGTYPE(0) + CMPCAP(1) + BTI(3) + PWRLMT(12):
-         printf(" Processor TK-%02d", YY);
-         break;
-      case PKGTYPE(0) + CMPCAP(1) + BTI(6) + PWRLMT(2):
-         printf(" Processor L3%02d", RR);
-         break;
-      case PKGTYPE(0) + CMPCAP(1) + BTI(7) + PWRLMT(4):
-         printf(" Processor L5%02d", RR);
-         break;
-      }
-      
-#undef RR
-#undef PP
-#undef TT
-#undef ZZ
-#undef YY
-   } else if (__F(stash->val_1_eax) == _XF(1) + _F(15)
-              || __F(stash->val_1_eax) == _XF(2) + _F(15)) {
-      /*
-      ** Algorithm from:
-      **    AMD Revision Guide for AMD Family 10h Processors (41322 Rev 3.74)
-      **    AMD Revision Guide for AMD Family 11h Processors (41788 Rev 3.08)
-      ** But using only the Processor numbers.
-      */
-      unsigned int  str1;
-      unsigned int  str2;
-      unsigned int  pg;
-      unsigned int  partialmodel;
-      unsigned int  pkgtype;
-      unsigned int  nc;
-      const char*   s1;
-      const char*   s2;
-
-      if (__F(stash->val_1_eax) == _XF(1) + _F(15)) {
-         /* OK: Family 10h */
-      } else if (__F(stash->val_1_eax) == _XF(2) + _F(15)) {
-         /* OK: Family 11h */
-      } else {
-         /* This algorithm supports no other families. */
-         return;
-      }
-
-      str2         = BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx),  0,  4);
-      partialmodel = BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx),  4, 11);
-      str1         = BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 11, 15);
-      pg           = BIT_EXTRACT_LE(__XB(stash->val_80000001_ebx), 15, 16);
-      pkgtype      = BIT_EXTRACT_LE(stash->val_80000001_ebx, 28, 32);
-      nc           = BIT_EXTRACT_LE(stash->val_80000008_ecx,  0,  8);
-
-      if (pkgtype >= 2) {
-         partialmodel--;
-      }
-
-#define NC(nc)            ((nc)   << 9)
-#define PG(pg)            ((pg)   << 8)
-#define STR1(str1)        ((str1) << 4)
-#define STR2(str2)        (str2)
-
-      /* 
-      ** In every String2 Values table, there were special cases for
-      ** pg == 0 && str2 == 15 which defined them as a the empty string.
-      ** But that produces the same result as an undefined string, so
-      ** don't bother trying to handle them.
-      */
-      if (__F(stash->val_1_eax) == _XF(1) + _F(15)) {
-         /* Family 10h tables */
-         switch (pkgtype) {
-         case 0:
-            /* 41322 3.74: table 14: String1 Values for Fr2, Fr5, and Fr6 (1207) Processors */
-            switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(3) + STR1(0): s1 = "Processor 83"; break;
-            case PG(0) + NC(3) + STR1(1): s1 = "Processor 23"; break;
-            case PG(0) + NC(5) + STR1(0): s1 = "Processor 84"; break;
-            case PG(0) + NC(5) + STR1(1): s1 = "Processor 24"; break;
-            case PG(1) + NC(3) + STR1(1): s1 = "Processor ";   break;
-            default:                      s1 = NULL;           break;
-            }
-            /* 41322 3.74: table 15: String2 Values for Fr2, Fr5, and Fr6 (1207) Processors */
-            switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(3) + STR2(10): s2 = " SE";   break;
-            case PG(0) + NC(3) + STR2(11): s2 = " HE";   break;
-            case PG(0) + NC(3) + STR2(12): s2 = " EE";   break;
-            case PG(0) + NC(5) + STR2(0):  s2 = " SE";   break;
-            case PG(0) + NC(5) + STR2(1):  s2 = " HE";   break;
-            case PG(0) + NC(5) + STR2(2):  s2 = " EE";   break;
-            case PG(1) + NC(3) + STR2(1):  s2 = "GF HE"; break;
-            case PG(1) + NC(3) + STR2(2):  s2 = "HF HE"; break;
-            case PG(1) + NC(3) + STR2(3):  s2 = "VS";    break;
-            case PG(1) + NC(3) + STR2(4):  s2 = "QS HE"; break;
-            case PG(1) + NC(3) + STR2(5):  s2 = "NP HE"; break;
-            case PG(1) + NC(3) + STR2(6):  s2 = "KH HE"; break;
-            case PG(1) + NC(3) + STR2(7):  s2 = "KS HE"; break;
-            default:                       s2 = NULL;    break;
-            }
-            break;
-         case 1:
-            /* 41322 3.74: table 16: String1 Values for AM2r2 and AM3 Processors */
-            switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(0) + STR1(2):  s1 = "1";
-            /* This case obviously collides with one later */
-            /* case PG(0) + NC(0) + STR1(3): s1 = "AMD Athlon(tm) II 1"; */
-            case PG(0) + NC(0) + STR1(1):  s1 = "";             break;
-            case PG(0) + NC(0) + STR1(3):  s1 = "2";            break;
-            case PG(0) + NC(0) + STR1(4):  s1 = "B";            break;
-            case PG(0) + NC(0) + STR1(5):  s1 = "";             break;
-            case PG(0) + NC(0) + STR1(7):  s1 = "5";            break;
-            case PG(0) + NC(0) + STR1(10): s1 = "";             break;
-            case PG(0) + NC(0) + STR1(11): s1 = "B";            break;
-            case PG(0) + NC(0) + STR1(12): s1 = "1";            break;
-            case PG(0) + NC(2) + STR1(0):  s1 = "";             break;
-            case PG(0) + NC(2) + STR1(3):  s1 = "B";            break;
-            case PG(0) + NC(2) + STR1(4):  s1 = "";             break;
-            case PG(0) + NC(2) + STR1(7):  s1 = "4";            break;
-            case PG(0) + NC(2) + STR1(8):  s1 = "7";            break;
-            case PG(0) + NC(2) + STR1(10): s1 = "";             break;
-            case PG(0) + NC(3) + STR1(0):  s1 = "Processor 13"; break;
-            case PG(0) + NC(3) + STR1(2):  s1 = "";             break;
-            case PG(0) + NC(3) + STR1(3):  s1 = "9";            break;
-            case PG(0) + NC(3) + STR1(4):  s1 = "8";            break;
-            case PG(0) + NC(3) + STR1(7):  s1 = "B";            break;
-            case PG(0) + NC(3) + STR1(8):  s1 = "";             break;
-            case PG(0) + NC(3) + STR1(10): s1 = "6";            break;
-            case PG(0) + NC(3) + STR1(15): s1 = "";             break;
-            case PG(0) + NC(5) + STR1(0):  s1 = "1";            break;
-            case PG(1) + NC(3) + STR1(2):  s1 = "9";            break;
-            case PG(1) + NC(3) + STR1(3):  s1 = "8";            break;
-            default:                       s1 = NULL;           break;
-            }
-            /* 41322 3.74: table 17: String2 Values for AM2r2 and AM3 Processors */
-            switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(0) + STR2(10): s2 = " Processor";                break;
-            case PG(0) + NC(0) + STR2(11): s2 = "u Processor";               break;
-            case PG(0) + NC(1) + STR2(3):  s2 = "50 Dual-Core Processor";    break;
-            case PG(0) + NC(1) + STR2(6):  s2 = " Processor";                break;
-            case PG(0) + NC(1) + STR2(7):  s2 = "e Processor";               break;
-            case PG(0) + NC(1) + STR2(9):  s2 = "0 Processor";               break;
-            case PG(0) + NC(1) + STR2(10): s2 = "0e Processor";              break;
-            case PG(0) + NC(1) + STR2(11): s2 = "u Processor";               break;
-            case PG(0) + NC(2) + STR2(0):  s2 = "00 Triple-Core Processor";  break;
-            case PG(0) + NC(2) + STR2(1):  s2 = "00e Triple-Core Processor"; break;
-            case PG(0) + NC(2) + STR2(2):  s2 = "00B Triple-Core Processor"; break;
-            case PG(0) + NC(2) + STR2(3):  s2 = "50 Triple-Core Processor";  break;
-            case PG(0) + NC(2) + STR2(4):  s2 = "50e Triple-Core Processor"; break;
-            case PG(0) + NC(2) + STR2(5):  s2 = "50B Triple-Core Processor"; break;
-            case PG(0) + NC(2) + STR2(6):  s2 = " Processor";                break;
-            case PG(0) + NC(2) + STR2(7):  s2 = "e Processor";               break;
-            case PG(0) + NC(2) + STR2(9):  s2 = "0e Processor";              break;
-            case PG(0) + NC(2) + STR2(10): s2 = "0 Processor";               break;
-            case PG(0) + NC(3) + STR2(0):  s2 = "00 Quad-Core Processor";    break;
-            case PG(0) + NC(3) + STR2(1):  s2 = "00e Quad-Core Processor";   break;
-            case PG(0) + NC(3) + STR2(2):  s2 = "00B Quad-Core Processor";   break;
-            case PG(0) + NC(3) + STR2(3):  s2 = "50 Quad-Core Processor";    break;
-            case PG(0) + NC(3) + STR2(4):  s2 = "50e Quad-Core Processor";   break;
-            case PG(0) + NC(3) + STR2(5):  s2 = "50B Quad-Core Processor";   break;
-            case PG(0) + NC(3) + STR2(6):  s2 = " Processor";                break;
-            case PG(0) + NC(3) + STR2(7):  s2 = "e Processor";               break;
-            case PG(0) + NC(3) + STR2(9):  s2 = "0e Processor";              break;
-            case PG(0) + NC(3) + STR2(14): s2 = "0 Processor";               break;
-            case PG(0) + NC(5) + STR2(0):  s2 = "5T Processor";              break;
-            case PG(0) + NC(5) + STR2(1):  s2 = "0T Processor";              break;
-            case PG(1) + NC(3) + STR2(4):  s2 = "T Processor";               break;
-            default:                       s2 = NULL;                        break;
-            }
-            break;
-         case 2:
-            /* 41322 3.74: table 18: String1 Values for S1g3 and S1g4 Processors */
-            switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(0) + STR1(0): s1 = "M1"; break;
-            case PG(0) + NC(0) + STR1(1): s1 = "V";  break;
-            case PG(0) + NC(1) + STR1(0): s1 = "M6"; break;
-            case PG(0) + NC(1) + STR1(1): s1 = "M5"; break;
-            case PG(0) + NC(1) + STR1(2): s1 = "M3"; break;
-            case PG(0) + NC(1) + STR1(3): s1 = "P";  break;
-            case PG(0) + NC(1) + STR1(4): s1 = "P";  break;
-            case PG(0) + NC(1) + STR1(5): s1 = "X";  break;
-            case PG(0) + NC(1) + STR1(6): s1 = "N";  break;
-            case PG(0) + NC(1) + STR1(7): s1 = "N";  break;
-            case PG(0) + NC(1) + STR1(8): s1 = "N";  break;
-            case PG(0) + NC(2) + STR1(2): s1 = "P";  break;
-            case PG(0) + NC(2) + STR1(3): s1 = "N";  break;
-            case PG(0) + NC(3) + STR1(1): s1 = "P";  break;
-            case PG(0) + NC(3) + STR1(2): s1 = "X";  break;
-            case PG(0) + NC(3) + STR1(3): s1 = "N";  break;
-            default: s1 = NULL;                      break;
-            }
-            /* 41322 3.74: table 19: String1 Values for S1g3 and S1g4 Processors */
-            switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(0) + STR2(1): s2 = "0 Processor";             break;
-            case PG(0) + NC(1) + STR2(2): s2 = "0 Dual-Core Processor";   break;
-            case PG(0) + NC(2) + STR2(2): s2 = "0 Triple-Core Processor"; break;
-            case PG(0) + NC(3) + STR2(1): s2 = "0 Quad-Core Processor";   break;
-            default:                      s2 = NULL;                      break;
-            }
-            break;
-         case 3:
-            /* 41322 3.74: table 20: String1 Values for G34r1 Processors */
-            switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(7)  + STR1(0): s1 = "Processor 61"; break;
-            case PG(0) + NC(11) + STR1(0): s1 = "Processor 61"; break;
-            /* It sure is odd that there are no 0/7/1 or 0/11/1 cases here. */
-            default:                       s1 = NULL;           break;
-            }
-            /* 41322 3.74: table 21: String2 Values for G34r1 Processors */
-            switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(7)  + STR1(0): s2 = " HE"; break;
-            case PG(0) + NC(7)  + STR1(1): s2 = " SE"; break;
-            case PG(0) + NC(11) + STR1(0): s2 = " HE"; break;
-            case PG(0) + NC(11) + STR1(1): s2 = " SE"; break;
-            default:                       s2 = NULL;  break;
-            }
-            break;
-         case 4:
-            /* 41322 3.74: table 22: String1 Values for ASB2 Processors */
-            switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(0) + STR1(1): s1 = "K"; break;
-            case PG(0) + NC(0) + STR1(2): s1 = "V"; break;
-            case PG(0) + NC(0) + STR1(3): s1 = "R"; break;
-            case PG(0) + NC(1) + STR1(1): s1 = "K"; break;
-            case PG(0) + NC(1) + STR1(2): s1 = "K"; break;
-            case PG(0) + NC(1) + STR1(3): s1 = "V"; break;
-            case PG(0) + NC(1) + STR1(4): s1 = "N"; break;
-            case PG(0) + NC(1) + STR1(5): s1 = "N"; break;
-            default: s1 = NULL;                     break;
-            }
-            /* 41322 3.74: table 23: String2 Values for ASB2 Processors */
-            switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(0)  + STR1(1): s2 = "5 Processor";           break;
-            case PG(0) + NC(0)  + STR1(2): s2 = "L Processor";           break;
-            case PG(0) + NC(1)  + STR1(1): s2 = "5 Dual-Core Processor"; break;
-            case PG(0) + NC(1)  + STR1(2): s2 = "L Dual-Core Processor"; break;
-            default:                       s2 = NULL;                    break;
-            }
-            break;
-         case 5:
-            /* 41322 3.74: table 24: String1 Values for C32r1 Processors */
-            switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(3) + STR1(0): s1 = "41"; break;
-            case PG(0) + NC(5) + STR1(0): s1 = "41"; break;
-            /* It sure is odd that there are no 0/3/1 or 0/5/1 cases here. */
-            default:                      s1 = NULL; break;
-            }
-            /* 41322 3.74: table 25: String2 Values for C32r1 Processors */
-            /* 41322 3.74: table 25 */
-            switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(3) + STR1(0): s2 = " HE"; break;
-            case PG(0) + NC(3) + STR1(1): s2 = " EE"; break;
-            case PG(0) + NC(5) + STR1(0): s2 = " HE"; break;
-            case PG(0) + NC(5) + STR1(1): s2 = " EE"; break;
-            default:                      s2 = NULL;  break;
-            }
-            break;
-         default:
-            s1 = NULL;
-            s2 = NULL;
-            break;
-         }
-      } else if (__F(stash->val_1_eax) == _XF(2) + _F(15)) {
-         /* Family 10h tables */
-         switch (pkgtype) {
-         case 2:
-            /* 41788 3.08: table 3: String1 Values for S1g2 Processors */
-            switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(0) + STR1(0): s1 = "SI-"; break;
-            case PG(0) + NC(0) + STR1(1): s1 = "QI-"; break;
-            case PG(0) + NC(1) + STR1(0): s1 = "ZM-"; break;
-            case PG(0) + NC(1) + STR1(1): s1 = "RM-"; break;
-            case PG(0) + NC(1) + STR1(2): s1 = "QL-"; break;
-            case PG(0) + NC(1) + STR1(3): s1 = "NI-"; break;
-            default: s1 = NULL;                       break;
-            }
-            /* 41788 3.08: table 4: String2 Values for S1g2 Processors */
-            switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(0) + STR2(0): s2 = "";   break;
-            case PG(0) + NC(1) + STR2(0): s2 = "";   break;
-            default:                      s2 = NULL; break;
-            }
-            break;
-         default:
-            s1 = NULL;
-            s2 = NULL;
-            break;
-         }
-      } else {
-         s1 = NULL;
-         s2 = NULL;
-      }
-
-#undef NC
-#undef PG
-#undef STR1
-#undef STR2
-
-      if (s1 != NULL) {
-         printf(" %s%02d", s1, partialmodel);
-         if (s2) printf("%s", s2);
-      }
-   }
-}
-
-static void
 print_synth_amd(const char*          name,
                 unsigned int         val,
                 const code_stash_t*  stash)
@@ -1932,6 +2176,7 @@ print_synth_amd(const char*          name,
    FM  (0, 5,  0, 1,         "AMD 5k86 (PR120, PR133)");
    FM  (0, 5,  0, 2,         "AMD 5k86 (PR166)");
    FM  (0, 5,  0, 3,         "AMD 5k86 (PR200)");
+   FM  (0, 5,  0, 5,         "AMD Geode GX");
    FM  (0, 5,  0, 6,         "AMD K6, .30um");
    FM  (0, 5,  0, 7,         "AMD K6 (Little Foot), .25um");
    FMS (0, 5,  0, 8,  0,     "AMD K6-2 (Chomper A)");
@@ -1939,8 +2184,9 @@ print_synth_amd(const char*          name,
    FM  (0, 5,  0, 8,         "AMD K6-2 (Chomper)");
    FMS (0, 5,  0, 9,  1,     "AMD K6-III (Sharptooth B)");
    FM  (0, 5,  0, 9,         "AMD K6-III (Sharptooth)");
+   FM  (0, 5,  0,10,         "AMD Geode LX");
    FM  (0, 5,  0,13,         "AMD K6-2+, K6-III+");
-   F   (0, 5,                "AMD 5k86 / K6 (unknown model)");
+   F   (0, 5,                "AMD 5k86 / K6 / Geode (unknown model)");
    FM  (0, 6,  0, 1,         "AMD Athlon, .25um");
    FM  (0, 6,  0, 2,         "AMD Athlon (K75 / Pluto / Orion), .18um");
    FMS (0, 6,  0, 3,  0,     "AMD Duron / mobile Duron (Spitfire A0)");
@@ -1995,13 +2241,15 @@ print_synth_amd(const char*          name,
    FMSQ(0, 6,  0, 8,  0, dX, "AMD Athlon XP (Thoroughbred A0)");
    FMSQ(0, 6,  0, 8,  0, dA, "AMD Athlon (Thoroughbred A0)");
    FMS (0, 6,  0, 8,  0,     "AMD Athlon / Athlon XP / Athlon MP / Sempron / Duron / Duron MP (Thoroughbred A0)");
+   FMSQ(0, 6,  0, 8,  1, MG, "AMD Geode NX (Thoroughbred B0)");
    FMSQ(0, 6,  0, 8,  1, dS, "AMD Sempron (Thoroughbred B0)");
    FMSQ(0, 6,  0, 8,  1, sD, "AMD Duron MP (Thoroughbred B0)");
    FMSQ(0, 6,  0, 8,  1, dD, "AMD Duron (Thoroughbred B0)");
    FMSQ(0, 6,  0, 8,  1, sA, "AMD Athlon MP (Thoroughbred B0)");
    FMSQ(0, 6,  0, 8,  1, dX, "AMD Athlon XP (Thoroughbred B0)");
    FMSQ(0, 6,  0, 8,  1, dA, "AMD Athlon (Thoroughbred B0)");
-   FMS (0, 6,  0, 8,  1,     "AMD Athlon / Athlon XP / Athlon MP / Sempron / Duron / Duron MP (Thoroughbred B0)");
+   FMS (0, 6,  0, 8,  1,     "AMD Athlon / Athlon XP / Athlon MP / Sempron / Duron / Duron MP / Geode (Thoroughbred B0)");
+   FMQ (0, 6,  0, 8,     MG, "AMD Geode NX (Thoroughbred)");
    FMQ (0, 6,  0, 8,     dS, "AMD Sempron (Thoroughbred)");
    FMQ (0, 6,  0, 8,     sD, "AMD Duron MP (Thoroughbred)");
    FMQ (0, 6,  0, 8,     dD, "AMD Duron (Thoroughbred)");
@@ -2009,7 +2257,7 @@ print_synth_amd(const char*          name,
    FMQ (0, 6,  0, 8,     sA, "AMD Athlon MP (Thoroughbred)");
    FMQ (0, 6,  0, 8,     dX, "AMD Athlon XP (Thoroughbred)");
    FMQ (0, 6,  0, 8,     dA, "AMD Athlon XP (Thoroughbred)");
-   FM  (0, 6,  0, 8,         "AMD Athlon / Athlon XP / Athlon MP / Sempron / Duron / Duron MP (Thoroughbred)");
+   FM  (0, 6,  0, 8,         "AMD Athlon / Athlon XP / Athlon MP / Sempron / Duron / Duron MP / Geode (Thoroughbred)");
    FMSQ(0, 6,  0,10,  0, dS, "AMD Sempron (Barton A2)");
    FMSQ(0, 6,  0,10,  0, ML, "AMD mobile Athlon XP-M (LV) (Barton A2)");
    FMSQ(0, 6,  0,10,  0, MX, "AMD mobile Athlon XP-M (Barton A2)");
@@ -2437,9 +2685,18 @@ print_synth_amd(const char*          name,
    FMQ (2,15,  0, 3,     dA, "AMD Athlon (Lion), 65nm");
    FM  (2,15,  0, 3,         "AMD Turion X2 (Lion) / Athlon (Lion) / Sempron (Sable), 65nm");
    F   (2,15,                "AMD Turion X2 Mobile / Athlon / Athlon X2 / Sempron / Sempron X2, 65nm");
+   FMS (5,15,  0, 1,  0,     "AMD C-Series (Ontario B0) / E-Series (Zacate B0) / G-Series (Ontario/Zacat B0), 40nm");
+   FM  (5,15,  0, 1,         "AMD C-Series (Ontario) / E-Series (Zacate) / G-Series (Ontario/Zacat), 40nm");
+   F   (5,15,                "AMD C-Series / E-Series / G-Series, 40nm");
    DEFAULT                  ("unknown");
 
-   print_synth_amd_model(stash);
+   const char*  brand_pre;
+   const char*  brand_post;
+   char         proc[96];
+   decode_amd_model(stash, &brand_pre, &brand_post, proc);
+   if (proc[0] != '\0') {
+      printf(" %s", proc);
+   }
    
    printf("\n");
 }
@@ -2548,15 +2805,18 @@ print_synth_transmeta(const char*          name,
    /* TODO: Add code-based detail for Transmeta Efficeon */
    printf(name);
    START;
-   FMSQ(0,5,  0,4,  2, t2, "Transmeta Crusoe TM3200");
-   FMS (0,5,  0,4,  2,     "Transmeta Crusoe TM3x00 (unknown model)");
-   FMSQ(0,5,  0,4,  3, t4, "Transmeta Crusoe TM5400");
-   FMSQ(0,5,  0,4,  3, t5, "Transmeta Crusoe TM5500 / Crusoe SE TM55E");
-   FMSQ(0,5,  0,4,  3, t6, "Transmeta Crusoe TM5600");
-   FMSQ(0,5,  0,4,  3, t8, "Transmeta Crusoe TM5800 / Crusoe SE TM58E");
-   FMS (0,5,  0,4,  3,     "Transmeta Crusoe TM5x00 (unknown model)");
-   FM  (0,5,  0,4,         "Transmeta Crusoe");
-   F   (0,5,               "Transmeta Crusoe (unknown model)");
+   FMSQ(0, 5,  0,4,  2, t2, "Transmeta Crusoe TM3200");
+   FMS (0, 5,  0,4,  2,     "Transmeta Crusoe TM3x00 (unknown model)");
+   FMSQ(0, 5,  0,4,  3, t4, "Transmeta Crusoe TM5400");
+   FMSQ(0, 5,  0,4,  3, t5, "Transmeta Crusoe TM5500 / Crusoe SE TM55E");
+   FMSQ(0, 5,  0,4,  3, t6, "Transmeta Crusoe TM5600");
+   FMSQ(0, 5,  0,4,  3, t8, "Transmeta Crusoe TM5800 / Crusoe SE TM58E");
+   FMS (0, 5,  0,4,  3,     "Transmeta Crusoe TM5x00 (unknown model)");
+   FM  (0, 5,  0,4,         "Transmeta Crusoe");
+   F   (0, 5,               "Transmeta Crusoe (unknown model)");
+   FM  (0,15,  0,2,         "Transmeta Efficeon TM8x00");
+   FM  (0,15,  0,3,         "Transmeta Efficeon TM8x00");
+   F   (0,15,               "Transmeta Efficeon (unknown model)");
    DEFAULT                ("unknown");
    printf("\n");
 }
@@ -2568,6 +2828,19 @@ print_synth_sis(const char*   name,
    printf(name);
    START;
    FM (0,5,  0,0,     "SiS 55x");
+   DEFAULT           ("unknown");
+   printf("\n");
+}
+
+static void
+print_synth_nsc(const char*   name,
+                unsigned int  val)
+{
+   printf(name);
+   START;
+   FM (0,5,  0,4,     "NSC Geode GX1/GXLV/GXm");
+   FM (0,5,  0,5,     "NSC Geode GX2");
+   F  (0,5,           "NSC Geode (unknown model)");
    DEFAULT           ("unknown");
    printf("\n");
 }
@@ -2671,6 +2944,9 @@ print_synth_simple(unsigned int  val_eax,
    case VENDOR_SIS:
       print_synth_sis("      (simple synth)  = ", val_eax);
       break;
+   case VENDOR_NSC:
+      print_synth_nsc("      (simple synth)  = ", val_eax);
+      break;
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -2707,6 +2983,9 @@ print_synth(const code_stash_t*  stash)
       break;
    case VENDOR_SIS:
       print_synth_sis("   (synth) = ", stash->val_1_eax);
+      break;
+   case VENDOR_NSC:
+      print_synth_nsc("   (synth) = ", stash->val_1_eax);
       break;
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
@@ -2932,6 +3211,8 @@ static void do_final (boolean        raw,
       decode_mp_synth(stash);
       print_mp_synth(&stash->mp);
       print_apic_synth(stash);
+      decode_override_brand(stash);
+      print_override_brand(stash);
       decode_brand_id_stash(stash);
       decode_brand_stash(stash);
       if (debug) {
@@ -3083,16 +3364,18 @@ print_1_ecx(unsigned int  value)
           { "CMPXCHG16B instruction"                  , 13, 13, bools },
           { "xTPR disable"                            , 14, 14, bools },
           { "perfmon and debug"                       , 15, 15, bools },
+          { "process context identifiers"             , 17, 17, bools },
           { "direct cache access"                     , 18, 18, bools },
           { "SSE4.1 extensions"                       , 19, 19, bools },
           { "SSE4.2 extensions"                       , 20, 20, bools },
           { "extended xAPIC support"                  , 21, 21, bools },
           { "MOVBE instruction"                       , 22, 22, bools },
           { "POPCNT instruction"                      , 23, 23, bools },
+          { "time stamp counter deadline"             , 24, 24, bools },
           { "AES instruction"                         , 25, 25, bools },
           { "XSAVE/XSTOR states"                      , 26, 26, bools },
           { "OS-enabled XSAVE/XSTOR"                  , 27, 27, bools },
-          { "AVX instruction"                         , 28, 28, bools },
+          { "AVX: advanced vector extensions"         , 28, 28, bools },
           { "F16C half-precision convert instruction" , 29, 29, bools },
           { "hypervisor guest status"                 , 31, 31, bools },
         };
@@ -3158,11 +3441,6 @@ static void print_2_meaning(unsigned char  value,
       }
    }
 
-   // Certain values in this table are noted with "MS", which means that they
-   // were submitted to me by Mike Stroyan.  I have no other verification that
-   // they are correct, but have included them anyway, because they collide with
-   // no known values.
-
    switch (value) {
    case 0x01: printf("instruction TLB: 4K pages, 4-way, 32 entries");    break;
    case 0x02: printf("instruction TLB: 4M pages, 4-way, 2 entries");     break;
@@ -3173,10 +3451,10 @@ static void print_2_meaning(unsigned char  value,
    case 0x08: printf("L1 instruction cache: 16K, 4-way, 32 byte lines"); break;
    case 0x09: printf("L1 instruction cache: 32K, 4-way, 64-byte lines"); break;
    case 0x0a: printf("L1 data cache: 8K, 2-way, 32 byte lines");         break;
-   case 0x0b: printf("instruction TLB: 4M pages, 4-way, 4 entries");     break; // MS
+   case 0x0b: printf("instruction TLB: 4M pages, 4-way, 4 entries");     break;
    case 0x0c: printf("L1 data cache: 16K, 4-way, 32 byte lines");        break;
    case 0x0d: printf("L1 data cache: 16K, 4-way, 64-byte lines");        break;
-   case 0x0e: printf("L1 data cache: 24K, 6-way, 64 byte lines");        break; // MS
+   case 0x0e: printf("L1 data cache: 24K, 6-way, 64 byte lines");        break;
    case 0x10: printf("L1 data cache: 16K, 4-way, 32 byte lines");        break;
    case 0x15: printf("L1 instruction cache: 16K, 4-way, 32 byte lines"); break;
    case 0x1a: printf("L2 cache: 96K, 6-way, 64 byte lines");             break;
@@ -3213,14 +3491,14 @@ static void print_2_meaning(unsigned char  value,
    case 0x4c: printf("L3 cache: 12M, 12-way, 64 byte lines");            break;
    case 0x4d: printf("L3 cache: 16M, 16-way, 64 byte lines");            break;
    case 0x4e: printf("L2 cache: 6M, 24-way, 64 byte lines");             break;
-   case 0x4f: printf("instruction TLB: 4K pages, 32 entries");           break; // MS
+   case 0x4f: printf("instruction TLB: 4K pages, 32 entries");           break;
    case 0x50: printf("instruction TLB: 4K & 2M/4M pages, 64 entries");   break;
    case 0x51: printf("instruction TLB: 4K & 2M/4M pages, 128 entries");  break;
    case 0x52: printf("instruction TLB: 4K & 2M/4M pages, 256 entries");  break;
    case 0x55: printf("instruction TLB: 2M/4M pages, fully, 7 entries");  break;
    case 0x56: printf("L1 data TLB: 4M pages, 4-way, 16 entries");        break;
    case 0x57: printf("L1 data TLB: 4K pages, 4-way, 16 entries");        break;
-   case 0x59: printf("data TLB: 4K pages, 16 entries");                  break; // MS
+   case 0x59: printf("data TLB: 4K pages, 16 entries");                  break;
    case 0x5a: printf("data TLB: 2M/4M pages, 4-way, 32 entries");        break;
    case 0x5b: printf("data TLB: 4K & 4M pages, 64 entries");             break;
    case 0x5c: printf("data TLB: 4K & 4M pages, 128 entries");            break;
@@ -3233,6 +3511,7 @@ static void print_2_meaning(unsigned char  value,
    case 0x71: printf("Trace cache: 16K-uop, 8-way");                     break;
    case 0x72: printf("Trace cache: 32K-uop, 8-way");                     break;
    case 0x73: printf("Trace cache: 64K-uop, 8-way");                     break;
+   case 0x76: printf("L2 cache: 1M, 4-way, 64 byte lines");              break;
    case 0x77: printf("L1 instruction cache: 16K, 4-way, sectored,"
                      " 64 byte lines");                                  break;
    case 0x78: printf("L2 cache: 1M, 4-way, 64 byte lines");              break;
@@ -3243,7 +3522,7 @@ static void print_2_meaning(unsigned char  value,
    case 0x7d: printf("L2 cache: 2M, 8-way, sectored, 64 byte lines");    break;
    case 0x7e: printf("L2 cache: 256K, 8-way, sectored, 128 byte lines"); break;
    case 0x7f: printf("L2 cache: 512K, 2-way, 64 byte lines");            break;
-   case 0x80: printf("L2 cache: 512K, 8-way, 64 byte lines");            break; // MS
+   case 0x80: printf("L2 cache: 512K, 8-way, 64 byte lines");            break;
    case 0x81: printf("L2 cache: 128K, 8-way, 32 byte lines");            break;
    case 0x82: printf("L2 cache: 256K, 8-way, 32 byte lines");            break;
    case 0x83: printf("L2 cache: 512K, 8-way, 32 byte lines");            break;
@@ -3263,8 +3542,8 @@ static void print_2_meaning(unsigned char  value,
    case 0xb2: printf("instruction TLB: 4K, 4-way, 64 entries");          break;
    case 0xb3: printf("data TLB: 4K, 4-way, 128 entries");                break;
    case 0xb4: printf("data TLB: 4K, 4-way, 256 entries");                break;
-   case 0xba: printf("data TLB: 4K, 4-way, 64 entries");                 break; // MS
-   case 0xc0: printf("data TLB: 4K & 4M pages, 4-way, 8 entries");       break; // MS
+   case 0xba: printf("data TLB: 4K, 4-way, 64 entries");                 break;
+   case 0xc0: printf("data TLB: 4K & 4M pages, 4-way, 8 entries");       break;
    case 0xca: printf("L2 TLB: 4K, 4-way, 512 entries");                  break;
    case 0xd0: printf("L3 cache: 512K, 4-way, 64 byte lines");            break;
    case 0xd1: printf("L3 cache: 1M, 4-way, 64 byte lines");              break;
@@ -3283,7 +3562,7 @@ static void print_2_meaning(unsigned char  value,
    case 0xec: printf("L3 cache: 24M, 24-way, 64 byte lines");            break;
    case 0xf0: printf("64 byte prefetching");                             break;
    case 0xf1: printf("128 byte prefetching");                            break;
-   case 0xff: printf("cache data is in CPUID 4");                        break; // MS
+   case 0xff: printf("cache data is in CPUID 4");                        break;
    default:   printf("unknown");                                         break;
    }
 
@@ -3343,6 +3622,7 @@ print_4_edx(unsigned int  value)
    static named_item  names[]
       = { { "WBINVD/INVD behavior on lower caches"    ,  0,  0, bools },
           { "inclusive to lower caches"               ,  1,  1, bools },
+          { "complex cache indexing"                  ,  2,  2, bools },
         };
 
    print_names(value, names, LENGTH(names, named_item),
@@ -3404,7 +3684,10 @@ print_6_eax(unsigned int  value)
    static named_item  names[]
       = { { "digital thermometer"                     ,  0,  0, bools },
           { "Intel Turbo Boost Technology"            ,  1,  1, bools },
-          { "operating point protection"              ,  2,  2, bools },
+          { "ARAT always running APIC timer"          ,  2,  2, bools },
+          { "PLN power limit notification"            ,  4,  4, bools },
+          { "ECMD extended clock modulation duty"     ,  5,  5, bools },
+          { "PTM package thermal management"          ,  6,  6, bools },
         };
 
    print_names(value, names, LENGTH(names, named_item),
@@ -3427,6 +3710,7 @@ print_6_ecx(unsigned int  value)
 {
    static named_item  names[]
       = { { "ACNT/MCNT supported performance measure" ,  0,  0, bools },
+          { "performance-energy bias capability"      ,  3,  3, bools },
         };
 
    print_names(value, names, LENGTH(names, named_item),
@@ -3626,6 +3910,7 @@ print_80000001_eax(unsigned int  value,
    case VENDOR_NEXGEN:
    case VENDOR_RISE:
    case VENDOR_SIS:
+   case VENDOR_NSC:
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -3638,6 +3923,8 @@ print_80000001_edx_intel(unsigned int  value)
    static named_item  names[]
       = { { "SYSCALL and SYSRET instructions"         , 11, 11, bools },
           { "execution disable"                       , 20, 20, bools },
+          { "1-GB large page support"                 , 26, 26, bools },
+          { "RDTSCP"                                  , 27, 27, bools },
           { "64-bit extensions technology available"  , 29, 29, bools },
         };
 
@@ -3732,9 +4019,41 @@ print_80000001_edx_transmeta(unsigned int  value)
           { "time stamp counter"                      ,  4,  4, bools },
           { "RDMSR and WRMSR support"                 ,  5,  5, bools },
           { "CMPXCHG8B inst."                         ,  8,  8, bools },
+          { "APIC on chip"                            ,  9,  9, bools },
+          { "memory type range registers"             , 12, 12, bools },
+          { "global paging extension"                 , 13, 13, bools },
+          { "machine check architecture"              , 14, 14, bools },
           { "conditional move/compare instruction"    , 15, 15, bools },
           { "FP conditional move instructions"        , 16, 16, bools },
+          { "page size extension"                     , 17, 17, bools },
+          { "AMD multimedia instruction extensions"   , 22, 22, bools },
           { "MMX Technology"                          , 23, 23, bools },
+          { "FXSAVE/FXRSTOR"                          , 24, 24, bools },
+        };
+
+   printf("   extended feature flags (0x80000001/edx):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_80000001_edx_nsc(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "x87 FPU on chip"                         ,  0,  0, bools },
+          { "virtual-8086 mode enhancement"           ,  1,  1, bools },
+          { "debugging extensions"                    ,  2,  2, bools },
+          { "page size extensions"                    ,  3,  3, bools },
+          { "time stamp counter"                      ,  4,  4, bools },
+          { "RDMSR and WRMSR support"                 ,  5,  5, bools },
+          { "machine check exception"                 ,  7,  7, bools },
+          { "CMPXCHG8B inst."                         ,  8,  8, bools },
+          { "SYSCALL and SYSRET instructions"         , 11, 11, bools },
+          { "global paging extension"                 , 13, 13, bools },
+          { "conditional move/compare instruction"    , 15, 15, bools },
+          { "FPU conditional move instruction"        , 16, 16, bools },
+          { "MMX Technology"                          , 23, 23, bools },
+          { "6x86MX multimedia extensions"            , 24, 24, bools },
         };
 
    printf("   extended feature flags (0x80000001/edx):\n");
@@ -3759,6 +4078,9 @@ print_80000001_edx(unsigned int  value,
       break;
    case VENDOR_TRANSMETA:
       print_80000001_edx_transmeta(value);
+      break;
+   case VENDOR_NSC:
+      print_80000001_edx_nsc(value);
       break;
    case VENDOR_UMC:
    case VENDOR_NEXGEN:
@@ -3830,6 +4152,7 @@ print_80000001_ecx(unsigned int  value,
    case VENDOR_NEXGEN:
    case VENDOR_RISE:
    case VENDOR_SIS:
+   case VENDOR_NSC:
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -3871,12 +4194,12 @@ print_80000001_ebx_amd(unsigned int  value,
               || __F(val_1_eax) == _XF(2) + _F(15)) {
       static named_item  names[]
          = { { "raw"                                     ,  0, 31, NIL_IMAGES },
-             { "BrandId"                                 ,  0, 16, NIL_IMAGES },
-             { "str1"                                    , 11, 15, NIL_IMAGES },
+             { "BrandId"                                 ,  0, 15, NIL_IMAGES },
+             { "str1"                                    , 11, 14, NIL_IMAGES },
              { "str2"                                    ,  0,  3, NIL_IMAGES },
              { "PartialModel"                            ,  4, 10, NIL_IMAGES },
              { "PG"                                      , 15, 15, NIL_IMAGES },
-             { "PkgType"                                 , 23, 31, NIL_IMAGES },
+             { "PkgType"                                 , 28, 31, NIL_IMAGES },
            };
 
       printf("   extended brand id (0x80000001/ebx):\n");
@@ -3885,7 +4208,7 @@ print_80000001_ebx_amd(unsigned int  value,
    } else {
       static named_item  names[]
          = { { "raw"                                     ,  0, 31, NIL_IMAGES },
-             { "BrandId"                                 ,  0, 16, NIL_IMAGES },
+             { "BrandId"                                 ,  0, 15, NIL_IMAGES },
            };
 
       printf("   extended brand id (0x80000001/ebx):\n");
@@ -3911,6 +4234,7 @@ print_80000001_ebx(unsigned int  value,
    case VENDOR_NEXGEN:
    case VENDOR_RISE:
    case VENDOR_SIS:
+   case VENDOR_NSC:
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -4403,6 +4727,7 @@ print_80860001_edx(unsigned int  value)
           { "LongRun Table Interface LRTI (CMS 4.2)"  ,  3,  3, bools },
           { "persistent translation technology 1.x"   ,  7,  7, bools },
           { "persistent translation technology 2.0"   ,  8,  8, bools },
+          { "processor break events"                  , 12, 12, bools },
         };
 
    printf("   Transmeta feature flags (0x80860001/edx):\n");
@@ -4510,9 +4835,8 @@ usage(void)
    printf("\n");
    printf("options:\n");
    printf("\n");
-   printf("   -1,      --one-cpu    display information only for the first"
-                                    " CPU.\n");
-   printf("                         (Meaningful only with -k or --kernel.)\n");
+   printf("   -1,      --one-cpu    display information only for the current"
+                                    " CPU\n");
    printf("   -f FILE, --file=FILE  read raw hex information (-r output) from"
                                     " FILE instead\n");
    printf("                         of from executions of the cpuid"
@@ -4520,21 +4844,16 @@ usage(void)
    printf("   -h, -H,  --help       display this help information\n");
    printf("   -i,      --inst       use the CPUID instruction: The information"
                                     " it provides\n");
-   printf("                         is reliable, but it works on only the"
-                                    " current CPU.\n");
-   printf("                         This should be OK on single-chip systems or"
-                                    " homogeneous\n");
-   printf("                         multi-chip systems.  It is not necessary to"
+   printf("                         is reliable.  It is not necessary to"
                                     " be root.\n");
    printf("                         (This option is the default.)\n");
-   printf("   -k,      --kernel     use the CPUID kernel module: This displays"
-                                    " information\n");
-   printf("                         for all CPUs, but the information it"
-                                    " provides is not\n");
-   printf("                         reliable for all combinations of CPU type"
-                                    " and kernel\n");
-   printf("                         version.  Typically, it is necessary to be"
-                                    " root.\n");
+   printf("   -k,      --kernel     use the CPUID kernel module: The"
+                                    " information does not\n");
+   printf("                         seem to be reliable on all combinations of"
+                                    " CPU type\n");
+   printf("                         and kernel version.  Typically, it is"
+                                    " necessary to be\n");
+   printf("                         root.\n");
    printf("   -r,      --raw        display raw hex information with no"
                                     " decoding\n");
    printf("   -v,      --version    display cpuid version\n");
@@ -4650,6 +4969,8 @@ print_reg (unsigned int        reg,
          stash->vendor = VENDOR_TRANSMETA;
       } else if (IS_VENDOR_ID(words, "SiS SiS SiS ")) {
          stash->vendor = VENDOR_SIS;
+      } else if (IS_VENDOR_ID(words, "Geode by NSC")) {
+         stash->vendor = VENDOR_NSC;
       }
    } else if (reg == 1) {
       print_1_eax(words[WORD_EAX], stash->vendor);
