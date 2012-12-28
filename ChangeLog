@@ -1,4 +1,19 @@
+Wed Sep  1 2010 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+	* cpuid.c: Fixed buffer size in do_file() to be able to read new
+	  raw dumps with ecx information.  It needed a couple more characters.
+	* cpuid.c: Added Celeron M (Yonah D0) & Celeron M (Merom-L1 A1) synth
+	  entries.
+	* cpuid.c: added Xeon Processor LV (Sossaman D0).
+	* cpuid.c: Update Itanium chips in the synth tables.  Sadly, this all
+	  still is being done blind, as I have no access to any Itanium chips.
+	* cpuid.c: Wrote an x86_64 counterpart to the assembly code for
+	  bits_needed().
+	* Makefile, cpuid.proto.spec: Changed to support building for both i386
+	  and x86_64.
+
 Tue Aug 31 2010 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
 	* cpuid.c: Rearranged synth rules and substantially simplified query
 	  macros into something like the form I was hoping for when I started
 	  this redesign.
@@ -7,6 +22,9 @@ Tue Aug 31 2010 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Changed raw dump to include %ecx values to accomodate CPUID
 	  functions with gaps in the useful %ecx range (e.g. 0xd).  The file
 	  parser accepts either the old or new forms.
+	* Makefile, cpuid.proto.spec: Updated build scheme for my current
+	  systems.
+	* LICENSE: Changed to a GPL license.
 
 Mon Aug 30 2010 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Semi-mechanically eliminated the codes used to

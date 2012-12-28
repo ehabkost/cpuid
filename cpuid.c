@@ -981,15 +981,17 @@ print_synth_intel(const char*          name,
    FMQ (    0, 6,  0,13,     MP, "Intel Processor A100/A110 (Stealey), 90nm");
    FMQ (    0, 6,  0,13,     dP, "Intel Pentium M (Dothan), 90nm");
    FM  (    0, 6,  0,13,         "Intel Pentium M (Dothan) / Celeron M (Dothan), 90nm");
+   FMSQ(    0, 6,  0,14,  8, sX, "Intel Xeon Processor LV (Sossaman C0), 65nm");
+   FMSQ(    0, 6,  0,14,  8, dC, "Intel Celeron (Yonah C0), 65nm");
    FMSQ(    0, 6,  0,14,  8, Dc, "Intel Core Duo (Yonah C0), 65nm");
    FMSQ(    0, 6,  0,14,  8, dc, "Intel Core Solo (Yonah C0), 65nm");
-   FMSQ(    0, 6,  0,14,  8, dC, "Intel Celeron (Yonah C0), 65nm");
-   FMSQ(    0, 6,  0,14,  8, sX, "Intel Xeon Processor LV (Sossaman C0), 65nm");
    FMS (    0, 6,  0,14,  8,     "Intel Core Solo (Yonah C0) / Core Duo (Yonah C0) / Xeon Processor LV (Sossaman C0) / Celeron (Yonah C0), 65nm");
+   FMSQ(    0, 6,  0,14, 12, sX, "Intel Xeon Processor LV (Sossaman D0), 65nm");
+   FMSQ(    0, 6,  0,14, 12, dC, "Intel Celeron M (Yonah D0), 65nm");
    FMSQ(    0, 6,  0,14, 12, MP, "Intel Pentium Dual-Core Mobile T2000 (Yonah D0), 65nm");
    FMSQ(    0, 6,  0,14, 12, Dc, "Intel Core Duo (Yonah D0), 65nm");
    FMSQ(    0, 6,  0,14, 12, dc, "Intel Core Solo (Yonah D0), 65nm");
-   FMS (    0, 6,  0,14, 12,     "Intel Core Solo (Yonah D0) / Core Duo (Yonah D0) / Pentium Dual-Core Mobile T2000 (Yonah D0), 65nm");
+   FMS (    0, 6,  0,14, 12,     "Intel Core Solo (Yonah D0) / Core Duo (Yonah D0) / Xeon Processor LV (Sossaman D0) / Pentium Dual-Core Mobile T2000 (Yonah D0) / Celeron M (Yonah D0), 65nm");
    FMS (    0, 6,  0,14, 13,     "Intel Pentium Dual-Core Mobile T2000 (Yonah M0), 65nm");
    FMQ (    0, 6,  0,14,     sX, "Intel Xeon Processor LV (Sossaman), 65nm");
    FMQ (    0, 6,  0,14,     dC, "Intel Celeron (Yonah), 65nm");
@@ -1044,11 +1046,13 @@ print_synth_intel(const char*          name,
    FMQ (    0, 6,  0,15,     dC, "Intel Celeron M (Conroe) / Celeron (Merom) / Celeron Dual-Core (Allendale), 65nm");
    FM  (    0, 6,  0,15,         "Intel Core Duo / Core 2 Duo (Conroe / Allendale) / Core Duo Mobile (Merom) / Core 2 Duo Mobile (Merom) / Celeron (Merom) / Core 2 Extreme (Conroe) / Core 2 Extreme Quad-Core (Kentsfield) / Pentium Dual-Core (Allendale) / Celeron M (Conroe) / Celeron (Merom) / Celeron Dual-Core (Allendale) / Quad-Core Xeon (Kentsfield / Clovertown / Woodcrest) / Core 2 Extreme Quad-Core (Clovertown) / Xeon (Tigerton) / Dual-Core Xeon (Conroe / Woodcrest), 65nm");
    FMSQ(    0, 6,  1, 6,  1, MC, "Intel Celeron Processor 200/400/500 (Conroe-L/Merom-L A1), 65nm");
+   FMSQ(    0, 6,  1, 6,  1, dC, "Intel Celeron M (Merom-L A1), 65nm");
    FMSQ(    0, 6,  1, 6,  1, Mc, "Intel Core 2 Duo Mobile (Merom A1), 65nm");
-   FMS (    0, 6,  1, 6,  1,     "Intel Core 2 Duo Mobile (Merom A1) / Celeron 200/400/500 (Conroe-L/Merom-L A1), 65nm");
+   FMS (    0, 6,  1, 6,  1,     "Intel Core 2 Duo Mobile (Merom A1) / Celeron 200/400/500 (Conroe-L/Merom-L A1) / Celeron M (Merom-L A1), 65nm");
    FMQ (    0, 6,  1, 6,     MC, "Intel Celeron Processor 200/400/500 (Conroe-L/Merom-L), 65nm");
+   FMQ (    0, 6,  1, 6,     dC, "Intel Celeron M (Merom-L), 65nm");
    FMQ (    0, 6,  1, 6,     Mc, "Intel Core 2 Duo Mobile (Merom), 65nm");
-   FM  (    0, 6,  1, 6,         "Intel Core 2 Duo Mobile (Merom) / Celeron (Conroe-L/Merom-L), 65nm");
+   FM  (    0, 6,  1, 6,         "Intel Core 2 Duo Mobile (Merom) / Celeron (Conroe-L/Merom-L) / Celeron M (Merom-L), 65nm");
    FMSQ(    0, 6,  1, 7,  6, sQ, "Intel Xeon Processor 3300 (Yorkfield C0) / Xeon Processor 5200 (Wolfdale C0) / Xeon Processor 5400 (Harpertown C0), 45nm");
    FMSQ(    0, 6,  1, 7,  6, sX, "Intel Xeon Processor 3100 (Wolfdale C0) / Xeon Processor 5200 (Wolfdale C0) / Xeon Processor 5400 (Harpertown C0), 45nm");
    FMSQ(    0, 6,  1, 7,  6, Xc, "Intel Core 2 Extreme QX9000 (Yorkfield C0), 45nm");
@@ -1141,9 +1145,9 @@ print_synth_intel(const char*          name,
    FQ  (    0, 6,            MP, "Intel Mobile Pentium (unknown model)");
    FQ  (    0, 6,            dP, "Intel Pentium (unknown model)");
    F   (    0, 6,                "Intel Pentium II / Pentium III / Pentium M / Celeron / Celeron M / Core / Core 2 / Core i / Xeon / Atom (unknown model)");
-   FMS (    0, 7,  0, 6,  4,     "Intel Itanium (C0)");
-   FMS (    0, 7,  0, 7,  4,     "Intel Itanium (C1)");
-   FMS (    0, 7,  0, 8,  4,     "Intel Itanium (C2)");
+   FMS (    0, 7,  0, 6,  4,     "Intel Itanium (Merced C0)");
+   FMS (    0, 7,  0, 7,  4,     "Intel Itanium (Merced C1)");
+   FMS (    0, 7,  0, 8,  4,     "Intel Itanium (Merced C2)");
    F   (    0, 7,                "Intel Itanium (unknown model)");
    FMS (    0,15,  0, 0,  7,     "Intel Pentium 4 (Willamette B2), .18um");
    FMSQ(    0,15,  0, 0, 10, dP, "Intel Pentium 4 (Willamette C1), .18um");
@@ -1267,15 +1271,19 @@ print_synth_intel(const char*          name,
    F   (    0,15,                "Intel Pentium 4 / Pentium D / Xeon / Xeon MP / Celeron / Celeron D (unknown model)");
    FMS (    1,15,  0, 0,  7,     "Intel Itanium2 (McKinley B3), .18um");
    FM  (    1,15,  0, 0,         "Intel Itanium2 (McKinley), .18um");
-   FMS (    1,15,  0, 1,  5,     "Intel Itanium2 (Madison/Deerfield B1), .13um");
-   FM  (    1,15,  0, 1,         "Intel Itanium2 (Madison/Deerfield), .13um");
-   FMS (    1,15,  0, 2,  1,     "Intel Itanium2 (Madison A1), .13um");
-   FMS (    1,15,  0, 2,  2,     "Intel Itanium2 (Madison A2), .13um");
+   FMS (    1,15,  0, 1,  5,     "Intel Itanium2 (Madison/Deerfield/Hondo B1), .13um");
+   FM  (    1,15,  0, 1,         "Intel Itanium2 (Madison/Deerfield/Hondo), .13um");
+   FMS (    1,15,  0, 2,  1,     "Intel Itanium2 (Madison 9M/Fanwood A1), .13um");
+   FMS (    1,15,  0, 2,  2,     "Intel Itanium2 (Madison 9M/Fanwood A2), .13um");
    FM  (    1,15,  0, 2,         "Intel Itanium2 (Madison), .13um");
    F   (    1,15,                "Intel Itanium2 (unknown model)");
-   FMS (    2,15,  0, 0,  5,     "Intel Itanium2 (Montecito C1), 90nm");
-   FMS (    2,15,  0, 0,  7,     "Intel Itanium2 (Montecito C2), 90nm");
-   FM  (    2,15,  0, 0,         "Intel Itanium2 (Montecito), 90nm");
+   FMS (    2,15,  0, 0,  5,     "Intel Itanium2 Dual-Core Processor 9000 (Montecito/Millington C1), 90nm");
+   FMS (    2,15,  0, 0,  7,     "Intel Itanium2 Dual-Core Processor 9000 (Montecito/Millington C2), 90nm");
+   FM  (    2,15,  0, 0,         "Intel Itanium2 Dual-Core Processor 9000 (Montecito/Millington), 90nm");
+   FMS (    2,15,  0, 1,  1,     "Intel Itanium2 Dual-Core Processor 9100 (Montvale A1), 90nm");
+   FM  (    2,15,  0, 1,         "Intel Itanium2 Dual-Core Processor 9100 (Montvale), 90nm");
+   FMS (    2,15,  0, 2,  4,     "Intel Itanium2 Dual-Core Processor 9300 (Tukwila E0), 90nm");
+   FM  (    2,15,  0, 2,         "Intel Itanium2 Dual-Core Processor 9300 (Tukwila), 90nm");
    F   (    2,15,                "Intel Itanium2 (unknown model)");
    DEFAULT                      ("unknown");
    printf("\n");
@@ -2839,6 +2847,20 @@ static void print_mp_synth(const struct mp*  mp)
 static int bits_needed(unsigned long  v)
 {
    int  result;
+#ifdef __x86_64
+   asm("movq %[v],%%rax;"
+       "movq $0,%%rcx;"
+       "movl $0,%[result];"
+       "decq %%rax;"
+       "bsr %%ax,%%cx;"
+       "jz 1f;"
+       "incq %%rcx;"
+       "movl %%ecx,%[result];"
+       "1:"
+       : [result] "=rm" (result)
+       : [v] "irm" (v) 
+       : "eax", "ecx");
+#else
    asm("movl %[v],%%eax;"
        "movl $0,%%ecx;"
        "movl $0,%[result];"
@@ -2851,6 +2873,7 @@ static int bits_needed(unsigned long  v)
        : [result] "=rm" (result)
        : [v] "irm" (v) 
        : "eax", "ecx");
+#endif
    return result;
 }
 
@@ -5226,7 +5249,7 @@ do_file(ccstring  filename,
    }
 
    while (!feof(file)) {
-      char          buffer[80];
+      char          buffer[88];
       char*         ptr;
       unsigned int  len;
       int           status;

@@ -1,4 +1,4 @@
-%define version 20100831
+%define version 20100901
 %define release 1
 Summary: dumps CPUID information about the CPU(s)
 Name: cpuid
@@ -18,7 +18,7 @@ instruction, and also determines the exact model of CPU(s).
 %setup
 
 %build
-%{__make}
+%{__make} %{?_smp_mflags} CFLAGS="$RPM_OPT_FLAGS"
 
 %install
 %{__make} install BUILDROOT=${RPM_BUILD_ROOT}
