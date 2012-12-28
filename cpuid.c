@@ -250,6 +250,7 @@ typedef enum {
    nC, /* not    Celeron                                                      */
    dc, /*        Core Solo                                                    */
    Dc, /*        Core Duo                                                     */
+   Da, /*        Core Duo (Allendale)                                         */
    dO, /*                                      Opteron                        */
    d8, /*                                      Opteron (8xx)                  */
    dX, /*                                      Athlon XP                      */
@@ -308,6 +309,7 @@ typedef struct {
                  /* none */     /* Celeron                  -               */
 
    boolean       L2_2M;         /* Nocona lacks, Irwindale has */
+                                /* Conroe has more, Allendale has this */
    boolean       L3;            /* Cranford lacks, Potomac has */
 
    boolean       L2_256K;       /* Barton has more, Thorton has this */
@@ -487,7 +489,8 @@ decode_brand(const code_stash_t*  stash)
             return dD;
          } else if (strstr(brand, "Pentium") != NULL) {
             return dP;
-         } else if (strstr(brand, "Genuine Intel(R) CPU") != NULL) {
+         } else if (strstr(brand, "Genuine Intel(R) CPU") != NULL
+                    || strstr(brand, "Intel(R) Core(TM)2 CPU") != NULL) {
             return dc;
          }
       }
@@ -504,7 +507,7 @@ decode_brand(const code_stash_t*  stash)
             return MA;
          }
       } else if (strstr(brand, "Mobile") != NULL) {
-         if (strstr(brand, "Athlon(tm) XP-M") != NULL) {
+         if (strstr(brand, "Athlon(tm) XP") != NULL) {
             return MX;
          } else if (strstr(brand, "Athlon(tm) 64") != NULL) {
             return MA;
@@ -575,6 +578,26 @@ decode_brand_code(const code_stash_t*  stash)
 }
 
 static code_t
+specialize_intel_mp(code_t               result,
+                    const code_stash_t*  stash)
+{
+   if (stash->vendor == VENDOR_INTEL) {
+      switch (result) {
+      case dc:
+         if (stash->mp.cores == 2) {
+            result = Dc;
+         }
+         break;
+      default:
+         /* DO NOTHING */
+         break;
+      }
+   }
+
+   return result;
+}
+
+static code_t
 specialize_intel_cache(code_t               result,
                        const code_stash_t*  stash)
 {
@@ -595,6 +618,15 @@ specialize_intel_cache(code_t               result,
             if (stash->L3) {
                /* to distinguish Potomac from Cranford */
                result = sP;
+            }
+         }
+         break;
+      case Dc:
+         switch (__FMS(stash->val_1_eax)) {
+         case _F(6) + _M(15) + _S(5):
+         case _F(6) + _M(15) + _S(6):
+            if (stash->L2_2M) {
+               result = Da;
             }
          }
          break;
@@ -630,26 +662,6 @@ specialize_intel_VT(code_t               result,
                /* to distinguish Paxville Series 7000 from Paxville 2.80 GHz */
                result = s7;
             }
-         }
-         break;
-      default:
-         /* DO NOTHING */
-         break;
-      }
-   }
-
-   return result;
-}
-
-static code_t
-specialize_intel_mp(code_t               result,
-                    const code_stash_t*  stash)
-{
-   if (stash->vendor == VENDOR_INTEL) {
-      switch (result) {
-      case dc:
-         if (stash->mp.cores == 2) {
-            result = Dc;
          }
          break;
       default:
@@ -785,9 +797,9 @@ decode(const code_stash_t*  stash)
       result = decode_rev_cache(stash);
    }
 
+   result = specialize_intel_mp(result, stash);
    result = specialize_intel_cache(result, stash);
    result = specialize_intel_VT(result, stash);
-   result = specialize_intel_mp(result, stash);
    result = specialize_amd_model(result, stash);
    result = specialize_amd_cache(result, stash);
 
@@ -965,18 +977,27 @@ print_synth_intel(const char*   name,
    FMC  (   6, 14,     sX, "Intel Xeon Processor LV (Sossaman), 65nm");
    FMC  (   6, 14,     dC, "Intel Celeron (Yonah), 65nm");
    FM   (   6, 14,         "Intel Core Solo (Yonah) / Core Duo (Yonah) / Xeon Processor LV (Sossaman) / Celeron (Yonah), 65nm");
-   FMS  (   6, 15,  5,     "Intel Core 2 Duo (Conroe B1) / Core 2 Extreme Processor (Conroe B1)");
+   /*
+   ** How to distinguish?
+   **    Core 2 Duo (Conroe B1)
+   **    Core 2 Extreme Processor (Conroe B1)
+   */
+   FMSC (   6, 15,  5, Dc, "Intel Core 2 Duo (Conroe B1) / Core 2 Extreme Processor (Conroe B1)");
+   FMSC (   6, 15,  5, Da, "Intel Core 2 Duo (Allendale B1)");
+   FMS  (   6, 15,  5,     "Intel Core 2 Duo (Conroe/Allendale B1) / Core 2 Extreme Processor (Conroe B1)");
    /*
    ** How to distinguish?
    **    Core 2 Duo (Conroe B2)
    **    Core 2 Extreme Processor (Conroe B2)
    */
-   FMSC (   6, 15,  6, dc, "Intel Core 2 Duo (Conroe B2) / Core 2 Extreme Processor (Conroe B2)");
+   FMSC (   6, 15,  6, Dc, "Intel Core 2 Duo (Conroe B2) / Core 2 Extreme Processor (Conroe B2)");
+   FMSC (   6, 15,  6, Da, "Intel Core 2 Duo (Allendale B2)");
    FMSC (   6, 15,  6, sX, "Intel Dual-Core Xeon Processor 5100 (Woodcrest B2), 65nm");
-   FMS  (   6, 15,  6,     "Intel Core 2 Duo (Conroe B2) / Core 2 Extreme Processor (Conroe B2) / Dual-Core Xeon Processor 5100 (Woodcrest B2), 65nm");
-   FMC  (   6, 15,     dc, "Intel Core 2 Duo (Conroe) / Core 2 Extreme Processor (Conroe)");
+   FMS  (   6, 15,  6,     "Intel Core 2 Duo (Conroe/Allendale B2) / Core 2 Extreme Processor (Conroe B2) / Dual-Core Xeon Processor 5100 (Woodcrest B2), 65nm");
+   FMC  (   6, 15,     Dc, "Intel Core 2 Duo (Conroe) / Core 2 Extreme Processor (Conroe)");
+   FMC  (   6, 15,     Da, "Intel Core 2 Duo (Allendale)");
    FMC  (   6, 15,     sX, "Intel Dual-Core Xeon Processor 5100 (Woodcrest), 65nm");
-   FM   (   6, 15,         "Intel Core 2 Duo (Conroe) / Core 2 Extreme Processor (Conroe) / Dual-Core Xeon Processor 5100 (Woodcrest), 65nm");
+   FM   (   6, 15,         "Intel Core 2 Duo (Conroe/Allendale) / Core 2 Extreme Processor (Conroe) / Dual-Core Xeon Processor 5100 (Woodcrest), 65nm");
    F    (   6,             "Intel Pentium II / Pentium III / Pentium M / Celeron / Mobile Celeron / Celeron M / Core Solo / Core Duo / Core 2 / Core 2 Extreme Processor / Xeon Processor LV / Xeon Processor 5100 (unknown model)");
    FMS  (   7,  6,  4,     "Intel Itanium (C0)");
    FMS  (   7,  7,  4,     "Intel Itanium (C1)");
@@ -1326,6 +1347,7 @@ print_synth_amd(const char*          name,
    FMSC  (6,     8,  0, dD, "AMD Duron (Applebred A0)");
    FMSC  (6,     8,  0, sD, "AMD Duron MP (Applebred A0)");
    FMSC  (6,     8,  0, dS, "AMD Sempron (Thoroughbred A0)");
+   FMSC  (6,     8,  0, MX, "AMD mobile Athlon XP (Thoroughbred A0)");
    FMS   (6,     8,  0,     "AMD Athlon XP / Athlon MP / Sempron / Duron / Duron MP (Thoroughbred A0)");
    FMSC  (6,     8,  1, dX, "AMD Athlon XP (Thoroughbred B0)");
    FMSC  (6,     8,  1, sA, "AMD Athlon MP (Thoroughbred B0)");
@@ -1337,6 +1359,7 @@ print_synth_amd(const char*          name,
    FMC   (6,     8,     sA, "AMD Athlon MP (Thoroughbred)");
    FMC   (6,     8,     dS, "AMD Sempron (Thoroughbred)");
    FMC   (6,     8,     sD, "AMD Duron MP (Thoroughbred)");
+   FMC   (6,     8,     MX, "AMD mobile Athlon XP (Thoroughbred)");
    FM    (6,     8,         "AMD Athlon XP / Athlon MP / Sempron / Duron / Duron MP (Thoroughbred)");
    FMSC  (6,    10,  0, dX, "AMD Athlon XP (Barton A2)");
    FMSC  (6,    10,  0, dt, "AMD Athlon XP (Thorton A2)");
@@ -1568,8 +1591,8 @@ print_synth_via(const char*   name,
 {
    printf(name);
    START;
-   FM (6,  6,     "VIA C3 (WinChip C5A core)");
-   FM (6,  6,     "VIA C3 (WinChip C5A core)");
+   FM (6,  6,     "VIA C3 (Samuel WinChip C5A core)");
+   FM (6,  6,     "VIA C3 (Samuel WinChip C5A core)");
    FMS(6,  7,  0, "VIA C3 (Samuel 2 WinChip C5B core) / Eden ESP 4000/5000/6000");
    FMS(6,  7,  1, "VIA C3 (Samuel 2 WinChip C5B core) / Eden ESP 4000/5000/6000");
    FMS(6,  7,  2, "VIA C3 (Samuel 2 WinChip C5B core) / Eden ESP 4000/5000/6000");
@@ -1589,8 +1612,8 @@ print_synth_via(const char*   name,
    FMS(6,  9,  6, "VIA C3 / Eden ESP 7000/8000/10000 (Nehemiah WinChip C5XL core)");
    FMS(6,  9,  7, "VIA C3 / Eden ESP 7000/8000/10000 (Nehemiah WinChip C5XL core)");
    FM (6,  9,     "VIA C3 / C3-M / Eden-N (Nehemiah WinChip C5P core)");
-   FM (6, 10,     "VIA (WinChip C5J core)");
-   F  (6,         "VIA C3 (unknown model)");
+   FM (6, 10,     "VIA C7 / C7-M (Esther WinChip C5J core)");
+   F  (6,         "VIA C3 / C3-M / C7 / C7-M / Eden ESP 7000/8000/10000 (unknown model)");
    DEFAULT       ("unknown");
    printf("\n");
 }
@@ -1882,11 +1905,11 @@ static void decode_mp_synth(code_stash_t*  stash)
          stash->mp.ok = TRUE;
          break;
       case VENDOR_AMD:
-         c  = GET_NC_AMD(stash->val_80000008_ecx) + 1;
+         c = GET_NC_AMD(stash->val_80000008_ecx) + 1;
          stash->mp.ok = (tc == c) == IS_CmpLegacy(stash->val_80000001_ecx);
          break;
       default:
-         c  = 0;
+         c = 0;
          stash->mp.ok = FALSE;
          break;
       }
@@ -2076,7 +2099,7 @@ print_1_ecx(unsigned int  value)
           { "thermal monitor 2"                       ,  8,  8, bools },
           { "context ID: adaptive or shared L1 data"  , 10, 10, bools },
           { "cmpxchg16b available"                    , 13, 13, bools },
-          { "send task priority messages"             , 14, 14, bools },
+          { "xTPR disable"                            , 14, 14, bools },
         };
 
    printf("   feature information (1/ecx):\n");
@@ -2280,7 +2303,7 @@ print_5_eax(unsigned int  value)
         };
 
    print_names(value, names, LENGTH(names, named_item),
-               /* max_len => */ 0);
+               /* max_len => */ 39);
 }
 
 static void
@@ -2291,7 +2314,34 @@ print_5_ebx(unsigned int  value)
         };
 
    print_names(value, names, LENGTH(names, named_item),
-               /* max_len => */ 0);
+               /* max_len => */ 39);
+}
+
+static void
+print_5_ecx(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "enum of Monitor-MWAIT exts supported"    ,  0,  0, bools },
+          { "supports intrs as break-event for MWAIT" ,  1,  1, bools },
+        };
+
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 39);
+}
+
+static void
+print_5_edx(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "number of C0 sub C-states using MWAIT"   ,  0,  3, NIL_IMAGES },
+          { "number of C1 sub C-states using MWAIT"   ,  4,  7, NIL_IMAGES },
+          { "number of C2 sub C-states using MWAIT"   ,  8, 11, NIL_IMAGES },
+          { "number of C3 sub C-states using MWAIT"   , 12, 15, NIL_IMAGES },
+          { "number of C4 sub C-states using MWAIT"   , 16, 19, NIL_IMAGES },
+        };
+
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 39);
 }
 
 static void
@@ -2303,7 +2353,7 @@ print_6_eax(unsigned int  value)
         };
 
    print_names(value, names, LENGTH(names, named_item),
-               /* max_len => */ 0);
+               /* max_len => */ 39);
 }
 
 static void
@@ -2313,6 +2363,50 @@ print_6_ebx(unsigned int  value)
       = { { "digital thermometer thresholds"          ,  0,  3, NIL_IMAGES },
         };
 
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 39);
+}
+
+static void
+print_6_ecx(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "ACNT/MCNT supported performance measure" ,  0,  0, bools },
+        };
+
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 39);
+}
+
+static void
+print_a_eax(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "version ID"                              ,  0,  7, NIL_IMAGES },
+          { "number of counters per logical processor",  8, 15, NIL_IMAGES },
+          { "bit width of counter"                    , 16, 23, NIL_IMAGES },
+          { "length of EBX bit vector"                , 24, 31, NIL_IMAGES },
+        };
+
+   printf("   Architecture Performance Monitoring Features (0xa/eax):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_a_ebx(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "core cycle event not available"          ,  0,  0, bools },
+          { "instruction retired event not available" ,  1,  1, bools },
+          { "reference cycles event not available"    ,  2,  2, bools },
+          { "last-level cache ref event not available",  3,  3, bools },
+          { "last-level cache miss event not avail"   ,  4,  4, bools },
+          { "branch inst retired event not available" ,  5,  5, bools },
+          { "branch mispred retired event not avail"  ,  6,  6, bools },
+        };
+
+   printf("   Architecture Performance Monitoring Features (0xa/ebx):\n");
    print_names(value, names, LENGTH(names, named_item),
                /* max_len => */ 0);
 }
@@ -3103,9 +3197,10 @@ usage(void)
    printf("   -h, -H,  --help       display this help information\n");
    printf("   -1,      --one-cpu    display information only for the first"
                                     " CPU\n");
-   printf("   -f FILE, --file=FILE  read raw hex information from FILE instead"
-                                    " of from\n");
-   printf("                         executions of the cpuid instruction\n");
+   printf("   -f FILE, --file=FILE  read raw hex information (-r output) from"
+                                    " FILE instead\n");
+   printf("                         of from executions of the cpuid"
+                                    " instruction\n");
    printf("   -r,      --raw        display raw hex information with no"
                                     " decoding\n");
    printf("\n");
@@ -3305,16 +3400,28 @@ print_reg (unsigned int        reg,
       printf("   deterministic cache parameters (4):\n");
       print_4_eax(words[WORD_EAX]);
       print_4_ebx(words[WORD_EAX]);
-      printf("      number of sets (s)                = %u\n", words[WORD_ECX]);
+      printf("      number of sets - 1 (s)            = %u\n", words[WORD_ECX]);
       stash->val_4_eax = words[WORD_EAX];
    } else if (reg == 5) {
       printf("   MONITOR/MWAIT (5):\n");
       print_5_eax(words[WORD_EAX]);
       print_5_ebx(words[WORD_EAX]);
+      print_5_ecx(words[WORD_ECX]);
+      print_5_edx(words[WORD_EDX]);
    } else if (reg == 6) {
-      printf("   Power Management Features (6):\n");
+      printf("   Thermal and Power Management Features (6):\n");
       print_6_eax(words[WORD_EAX]);
       print_6_ebx(words[WORD_EAX]);
+      print_6_ecx(words[WORD_ECX]);
+   } else if (reg == 7) {
+      /* Reserved: DO NOTHING */
+   } else if (reg == 8) {
+      /* Reserved: DO NOTHING */
+   } else if (reg == 9) {
+      /* Reserved: DO NOTHING */
+   } else if (reg == 0xa) {
+      print_a_eax(words[WORD_EAX]);
+      print_a_ebx(words[WORD_EBX]);
    } else if (reg == 0x80000000) {
       // basic_max already set to words[WORD_EAX]
    } else if (reg == 0x80000001) {

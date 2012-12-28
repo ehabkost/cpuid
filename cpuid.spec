@@ -1,4 +1,4 @@
-%define version 20060730
+%define version 20060806
 %define release 1
 Summary: dumps CPUID information about the CPU(s)
 Name: cpuid
@@ -17,13 +17,13 @@ instruction, and also determines the exact model of CPU(s).
 %setup
 
 %build
-make
+%{__make}
 
 %install
-make install BUILDROOT=${RPM_BUILD_ROOT}
+%{__make} install BUILDROOT=${RPM_BUILD_ROOT}
 
 %clean
-rm -rf $RPM_BUILD_DIR/$RPM_PACKAGE_NAME-$RPM_PACKAGE_VERSION
+%{__rm} -rf $RPM_BUILD_DIR/$RPM_PACKAGE_NAME-$RPM_PACKAGE_VERSION
 
 %files
 %defattr(-,root,root)

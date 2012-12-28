@@ -1,7 +1,7 @@
 .\"
-.\" $Id: cpuid.man,v 20060730 2006/07/30 12:58:00 todd $
+.\" $Id: cpuid.man,v 20060806 2006/08/06 20:50:00 todd $
 .\"
-.TH CPUID 1 "30 Jul 2006" "20060730"
+.TH CPUID 1 "6 Aug 2006" "20060806"
 .SH NAME 
 cpuid \- Dump CPUID information for each CPU
 .SH SYNOPSIS
@@ -231,10 +231,16 @@ from the following documents from Transmeta Corporation
 Processor Recognition, 2002/05/07
 .RE
 
-Also, information is available from the following web site:
+Also, information is available from the following web sites:
 
 .RS
 <http://www.sandpile.org/ia32/cpuid.htm>
+.br
+<http://en.wikipedia.org/wiki/List_of_Intel_microprocessors>
+.br
+<http://en.wikipedia.org/wiki/List_of_AMD_microprocessors>
+.br
+<http://en.wikipedia.org/wiki/Category:X86_microprocessors>
 .RE
 .SH COPYRIGHT
 Copyright 2003,2004,2005,2006 by Todd Allen.  All Rights Reserved.

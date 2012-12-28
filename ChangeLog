@@ -1,4 +1,44 @@
+Sun Aug  6 2006 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+
+Sat Aug  5 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added support for differentiating Core 2 Duo CPUs from Xeon 
+	  5100 CPUs based on the brand string.
+	* cpuid.c: Clarified that CPUID 4 ECX contains one less than the 
+	  number of sets.
+	* cpuid.c: Added support for CPUID 5 ecx & edx.
+	* cpuid.c: Added support for CPUID 6 ecx.
+	* cpuid.c: Added support for CPUID 0xa eax & ebx.
+	* cpuid.c: Made CPUID functions 7, 8, and 9 reserved (i.e. say nothing
+	  until and unless they are defined).
+	* cpuid.c: Corrected CPUID 1 ecx xTPR disabnle.
+
+Wed Aug  2 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Corrected bug with Core 2 Duo recognition.
+	* cpuid.c: Distinguish between Allendale and Conroe cores based on
+	  L2 cache size.
+	* cpuid.c: Added VIA C7 & C7-M names to Esther WinChip C5J core CPUs.
+	* cpuid.man: Mention wikipedia pages for CPUs.
+
+Tue Aug  1 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: On help screen, clarified that -f option reads output from 
+	  -r option.
+	* cpuid.proto.spec: Used %{} macros for external command invocations.
+
+Mon Jul 31 2006 Todd Allen <todd.allen@etallen.com>
+	* Makefile: Removed install -o 0 -g 0 options.  For installations
+	  from the tarball, the user will have to be root anyway.  And for
+	  rpm, the %defattr() attribute in the spec is handling this more
+	  cleanly.  Finally, those options are causing some non-root
+	  installations to have to be done by the root user, which is
+	  undesirable.
+	* cpuid.c: Improved identification for VIA C3 (Samuel WinChip C5A core).
+	* cpuid.c: Loosened up check for "Mobile AMD Athlon(tm) XP" by 
+	  removing "-M" suffix.
+	* cpuid.c: Recognize mobile Athlon XP (Thoroughbred).
+
 Sun Jul 30 2006 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
 	* cpuid.c: Fixed "deterministic cache parameters (4)", so that its
 	  children aren't staggered.
 	* cpuid.c: Corrected Venice and Palermo processors with DH-E3 and
@@ -19,6 +59,7 @@ Sun Jul 30 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Added Core 2 Conroe B1 & B2 & Core 2 Extreme Processor B1 & 
 	  B2.
 	* cpuid.c: Updated Itanium2 processors.
+	* cpuid.man: Added Intel specification updates for new CPUs.
 
 Wed Jul 26 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: In decode_brand, added check for "Athlon(TM) XP", equivalent 

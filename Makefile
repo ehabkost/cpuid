@@ -32,8 +32,8 @@ $(PROG).man.gz: $(PROG).man
 	gzip < $< > $@
 
 install: $(PROG) $(PROG).man.gz
-	install -D -s -m 755 -o 0 -g 0 $(PROG)        $(BUILDROOT)/usr/bin/$(PROG)
-	install -D    -m 444 -o 0 -g 0 $(PROG).man.gz $(BUILDROOT)/usr/share/man/man1/$(PROG).1.gz
+	install -D -s -m 755 $(PROG)        $(BUILDROOT)/usr/bin/$(PROG)
+	install -D    -m 444 $(PROG).man.gz $(BUILDROOT)/usr/share/man/man1/$(PROG).1.gz
 
 clean:
 	rm -f $(PROG) $(PROG).x86_64
