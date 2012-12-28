@@ -4023,6 +4023,7 @@ print_40000001_eax_kvm(unsigned int  value)
           { "mmu_op"                                  ,  2,  2, bools },
           { "kvmclock available a MSR 0x4b564d00"     ,  3,  3, bools },
           { "async pf enable available by MSR"        ,  4,  4, bools },
+          { "PV EOI optimization MSR at 0x4b564d04",     6,  6, bools },
           { "no guest per-cpu warps expected warning" , 24, 24, bools },
         };
 
