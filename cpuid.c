@@ -4190,7 +4190,7 @@ print_8000001a_eax(unsigned int  value)
           { "MOVU* better than MOVL*/MOVH*"           ,  1,  1, bools },
         };
 
-   printf("   SVM Secure Virtual Machine (0x8000000a/edx):\n");
+   printf("   SVM Secure Virtual Machine (0x8000001a/eax):\n");
    print_names(value, names, LENGTH(names, named_item),
                /* max_len => */ 0);
 }
@@ -4348,7 +4348,7 @@ print_8000001e_ebx(unsigned int  value)
           { "cores per compute unit - 1"              ,  8,  9, NIL_IMAGES },
         };
 
-   printf("   Extended APIC ID (0x8000001d/ebx):\n");
+   printf("   Extended APIC ID (0x8000001e/ebx):\n");
    print_names(value, names, LENGTH(names, named_item),
                /* max_len => */ 0);
 }
@@ -4367,7 +4367,7 @@ print_8000001e_ecx(unsigned int  value)
           { "nodes per processor"                     ,  8,  9, npp },
         };
 
-   printf("   Extended APIC ID (0x8000001d/ecx):\n");
+   printf("   Extended APIC ID (0x8000001e/ecx):\n");
    print_names(value, names, LENGTH(names, named_item),
                /* max_len => */ 0);
 }
@@ -4382,9 +4382,9 @@ print_80860001_eax(unsigned int  value)
                                    NULL,
                                    "Transmeta Crusoe" };
    static named_item  names[]
-      = { { "generation    "                          ,  8, 11, family },
-          { "model         "                          ,  4,  7, NIL_IMAGES },
-          { "stepping      "                          ,  0,  3, NIL_IMAGES },
+      = { { "generation"                              ,  8, 11, family },
+          { "model"                                   ,  4,  7, NIL_IMAGES },
+          { "stepping"                                ,  0,  3, NIL_IMAGES },
         };
 
    printf("   Transmeta processor signature (0x80860001/eax):\n");

@@ -5,7 +5,7 @@ endif
 CFL=$(CFLAGS) $(CISA) -Wall -Wshadow -Wcast-align -Wredundant-decls -Wbad-function-cast -Wcast-qual -Wwrite-strings -Waggregate-return -Wstrict-prototypes -Wmissing-prototypes -D_FILE_OFFSET_BITS=64 -DVERSION=$(VERSION)
 
 PACKAGE=cpuid
-VERSION=20100901
+VERSION=20100902
 RELEASE=1
 
 PROG=$(PACKAGE)

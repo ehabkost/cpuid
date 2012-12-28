@@ -1,3 +1,8 @@
+Thu Sep  2 2010 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+	* cpuid.c: Fixed a few header strings that had incorrect function hex
+	  codes or registers.
+
 Wed Sep  1 2010 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 	* cpuid.c: Fixed buffer size in do_file() to be able to read new
