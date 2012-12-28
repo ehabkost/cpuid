@@ -1,4 +1,28 @@
-Web Feb  8 2006 Todd Allen <todd.allen@etallen.com>
+Sun Feb 26 2006 Todd Allen <todd.allen@etallen.com>
+
+	* Made new release.
+
+Wed Feb 22 2006 Todd Allen <todd.allen@etallen.com>
+
+	* cpuid.c: Added VMX: virtual machine extensions to CPUID function 1,
+	  register ecx.
+	* cpuid.c: Added SVM LBR virtualization to CPUID function 8000000a,
+	  register edx.
+	* cpuid.c: Fixed cut & paste header error in print_8000000a_eax.
+
+Tue Feb 21 2006 Todd Allen <todd.allen@etallen.com>
+
+	* cpuid.c: Renamed "hyper-threading technology" field to 
+	  "hyper-threading / multi-core supported" to eliminate some confusing
+	  situations, such as Northwood chips which nominally support hyper-
+	  threading, but where it is disabled in the chip; or where hyper-
+	  threading is disabled in the BIOS; or AMD multi-core chips, which 
+	  indicate TRUE here, but all of which lack hyper-threading at present.
+	* cpuid.c: Updated family 15 description, which had grown very stale.
+	* cpuid.c: Generalized Intel Pentium D Processor 900 to 9x0.
+	* cpuid.c: Added Processor Number info to Smithfield processors.
+
+Wed Feb  8 2006 Todd Allen <todd.allen@etallen.com>
 
 	* cpuid.c: Use defined(i386) instead of __LONG_MAX__ to determine
 	  whether or not it's necessary to use _llseek().  Fixes handling of 

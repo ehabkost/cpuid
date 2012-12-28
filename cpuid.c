@@ -875,8 +875,8 @@ print_synth_intel(const char*   name,
    XFMSC(   0,  4,  3, sX, "Intel Xeon (Nocona N0), 90nm");
    XFMSC(   0,  4,  3, sI, "Intel Xeon (Irwindale N0), 90nm");
    XFMS (   0,  4,  3,     "Intel Pentium 4 (Prescott N0) / Xeon (Nocona N0 / Irwindale N0), 90nm");
-   XFMS (   0,  4,  4,     "Intel Pentium D (Smithfield A0) / Pentium Extreme Edition (Smithfield A0), 90nm");
-   XFMS (   0,  4,  7,     "Intel Extreme Edition (Smithfield B0), 90nm");
+   XFMS (   0,  4,  4,     "Intel Pentium D Processor 8x0 (Smithfield A0) / Pentium Extreme Edition Processor 840 (Smithfield A0), 90nm");
+   XFMS (   0,  4,  7,     "Intel Pentium D Processor 8x0 (Smithfield B0) / Pentium Extreme Edition Processor 840 (Smithfield B0), 90nm");
    /*
    ** How to distinguish?
    **    Dual-Core Xeon (Paxville A0)
@@ -900,7 +900,7 @@ print_synth_intel(const char*   name,
    **    Pentium 4 Processor 6x1 (Cedar Mill B1)
    **    Pentium Processor Extreme Edition 955 (Presler B1)
    */
-   XFMSC(   0,  6,  2, dD, "Intel Pentium D Processor 900 (Presler B1), 65nm");
+   XFMSC(   0,  6,  2, dD, "Intel Pentium D Processor 9x0 (Presler B1), 65nm");
    XFMS (   0,  6,  2,     "Intel Pentium 4 Processor 6x1 (Cedar Mill B1) / Pentium Processor Extreme Edition 955 (Presler B1) / Pentium D Processor 900 (Presler B1), 65nm");
    XFM  (   0,  6,         "Intel Pentium 4 Processor 6x1 (Cedar Mill) / Pentium Processor Extreme Edition 955 (Presler) / Pentium D Processor 900, (Presler), 65nm");
    XFC  (   0,         dP, "Intel Pentium 4 (unknown model)");
@@ -1741,7 +1741,11 @@ print_1_eax(unsigned int  value,
                                     NULL,
                                     NULL,
                                     NULL,
-                                    "Intel Pentium 4/Xeon/Itanium2 (15)" };
+                                    "Intel Pentium 4/Pentium D/"
+                                    "Pentium Extreme Edition/Celeron/Xeon/"
+                                    "Xeon MP/Itanium2,"
+                                    " AMD Athlon 64/Athlon XP-M/Opteron/"
+                                    "Sempron/Turion (15)" };
    static named_item  names[]
       = { { "processor type"                          , 12, 13, processor },
           { "family"                                  ,  8, 11, family },
@@ -1845,6 +1849,7 @@ print_1_ecx(unsigned int  value)
       = { { "PNI/SSE3: Prescott New Instructions"     ,  0,  0, bools },
           { "MONITOR/MWAIT"                           ,  3,  3, bools },
           { "CPL-qualified debug store"               ,  4,  4, bools },
+          { "VMX: virtual machine extensions"         ,  5,  5, bools },
           { "Enhanced Intel SpeedStep Technology"     ,  7,  7, bools },
           { "thermal monitor 2"                       ,  8,  8, bools },
           { "context ID: adaptive or shared L1 data"  , 10, 10, bools },
@@ -1887,7 +1892,7 @@ print_1_edx(unsigned int  value)
           { "SSE extensions"                          , 25, 25, bools },
           { "SSE2 extensions"                         , 26, 26, bools },
           { "self snoop"                              , 27, 27, bools },
-          { "hyper-threading technology"              , 28, 28, bools },
+          { "hyper-threading / multi-core supported"  , 28, 28, bools },
           { "therm. monitor"                          , 29, 29, bools },
           { "IA64"                                    , 30, 30, bools },
           { "pending break event"                     , 31, 31, bools },
@@ -2662,7 +2667,19 @@ print_8000000a_eax(unsigned int  value)
       = { { "SvmRev: SVM revision"                    ,  0,  7, NIL_IMAGES },
         };
 
-   printf("   Physical Address and Linear Address Size (0x80000008/eax):\n");
+   printf("   SVM Secure Virtual Machine (0x8000000a/eax):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_8000000a_edx(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "LBR virtualization"                      ,  1,  1, bools },
+        };
+
+   printf("   SVM Secure Virtual Machine (0x8000000a/edx):\n");
    print_names(value, names, LENGTH(names, named_item),
                /* max_len => */ 0);
 }
@@ -3209,6 +3226,7 @@ main(int     argc,
             /* reserved for Intel feature flag expansion */
          } else if (reg == 0x8000000a) {
             print_8000000a_eax(words[WORD_EAX]);
+            print_8000000a_edx(words[WORD_EAX]);
             print_8000000a_ebx(words[WORD_EBX]);
          } else if (0x8000000b <= reg && reg <= 0x80000018) {
             /* reserved for vendors to be determined feature flag expansion */
