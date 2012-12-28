@@ -5315,15 +5315,8 @@ print_reg (unsigned int        reg,
            unsigned int        try,
            code_stash_t*       stash)
 {
-   if (raw) {
-      print_reg_raw(reg, try, words);
-   } else if (reg == 0) {
-      // max already set to words[WORD_EAX]
+   if (reg == 0) {
       stash->val_0_eax = words[WORD_EAX];
-      printf("   vendor_id = \"%-4.4s%-4.4s%-4.4s\"\n",
-             (const char*)&words[WORD_EBX], 
-             (const char*)&words[WORD_EDX], 
-             (const char*)&words[WORD_ECX]);
       if (IS_VENDOR_ID(words, "GenuineIntel")) {
          stash->vendor = VENDOR_INTEL;
       } else if (IS_VENDOR_ID(words, "AuthenticAMD")) {
@@ -5350,15 +5343,48 @@ print_reg (unsigned int        reg,
          stash->vendor = VENDOR_RDC;
       }
    } else if (reg == 1) {
+      stash->val_1_eax = words[WORD_EAX];
+      stash->val_1_ebx = words[WORD_EBX];
+      stash->val_1_ecx = words[WORD_ECX];
+      stash->val_1_edx = words[WORD_EDX];
+   } else if (reg == 4) {
+      stash->saw_4 = TRUE;
+      if (try == 0) {
+         stash->val_4_eax = words[WORD_EAX];
+      }
+   } else if (reg == 0xb) {
+      stash->saw_b = TRUE;
+      if (try < sizeof(stash->val_b_eax) / sizeof(stash->val_b_eax[0])) {
+         stash->val_b_eax[try] = words[WORD_EAX];
+      }
+      if (try < sizeof(stash->val_b_ebx) / sizeof(stash->val_b_ebx[0])) {
+         stash->val_b_ebx[try] = words[WORD_EBX];
+      }
+   } else if (reg == 0x40000000) {
+      if (IS_HYPERVISOR_ID(words, "VMwareVMware")) {
+         stash->hypervisor = HYPERVISOR_VMWARE;
+      } else if (IS_HYPERVISOR_ID(words, "XenVMMXenVMM")) {
+         stash->hypervisor = HYPERVISOR_XEN;
+      } else if (IS_HYPERVISOR_ID(words, "KVMKVMKVM\0\0\0")) {
+         stash->hypervisor = HYPERVISOR_KVM;
+      } else if (IS_HYPERVISOR_ID(words, "Microsoft Hv")) {
+         stash->hypervisor = HYPERVISOR_MICROSOFT;
+      }
+   }
+
+   if (raw) {
+      print_reg_raw(reg, try, words);
+   } else if (reg == 0) {
+      printf("   vendor_id = \"%-4.4s%-4.4s%-4.4s\"\n",
+             (const char*)&words[WORD_EBX],
+             (const char*)&words[WORD_EDX],
+             (const char*)&words[WORD_ECX]);
+   } else if (reg == 1) {
       print_1_eax(words[WORD_EAX], stash->vendor);
       print_1_ebx(words[WORD_EBX]);
       print_brand(words[WORD_EAX], words[WORD_EBX]);
       print_1_edx(words[WORD_EDX]);
       print_1_ecx(words[WORD_ECX]);
-      stash->val_1_eax = words[WORD_EAX];
-      stash->val_1_ebx = words[WORD_EBX];
-      stash->val_1_ecx = words[WORD_ECX];
-      stash->val_1_edx = words[WORD_EDX];
    } else if (reg == 2) {
       unsigned int  word = 0;
       for (; word < 4; word++) {
@@ -5385,10 +5411,6 @@ print_reg (unsigned int        reg,
       print_4_edx(words[WORD_EDX]);
       printf("      number of sets - 1 (s)               = %u\n",
              words[WORD_ECX]);
-      stash->saw_4 = TRUE;
-      if (try == 0) {
-         stash->val_4_eax = words[WORD_EAX];
-      }
    } else if (reg == 5) {
       printf("   MONITOR/MWAIT (5):\n");
       print_5_eax(words[WORD_EAX]);
@@ -5415,13 +5437,6 @@ print_reg (unsigned int        reg,
       printf("      --- level %d (%s) ---\n", try,  (try == 0 ? "thread" :
                                                      try == 1 ? "core" :
                                                                 "package"));
-      stash->saw_b = TRUE;
-      if (try < sizeof(stash->val_b_eax) / sizeof(stash->val_b_eax[0])) {
-         stash->val_b_eax[try] = words[WORD_EAX];
-      }
-      if (try < sizeof(stash->val_b_ebx) / sizeof(stash->val_b_ebx[0])) {
-         stash->val_b_ebx[try] = words[WORD_EBX];
-      }
       print_b_eax(words[WORD_EAX]);
       print_b_ebx(words[WORD_EBX]);
       print_b_ecx(words[WORD_ECX]);
@@ -5461,15 +5476,6 @@ print_reg (unsigned int        reg,
              (const char*)&words[WORD_EBX], 
              (const char*)&words[WORD_ECX], 
              (const char*)&words[WORD_EDX]);
-      if (IS_HYPERVISOR_ID(words, "VMwareVMware")) {
-         stash->hypervisor = HYPERVISOR_VMWARE;
-      } else if (IS_HYPERVISOR_ID(words, "XenVMMXenVMM")) {
-         stash->hypervisor = HYPERVISOR_XEN;
-      } else if (IS_HYPERVISOR_ID(words, "KVMKVMKVM\0\0\0")) {
-         stash->hypervisor = HYPERVISOR_KVM;
-      } else if (IS_HYPERVISOR_ID(words, "Microsoft Hv")) {
-         stash->hypervisor = HYPERVISOR_MICROSOFT;
-      }
    } else if (reg == 0x40000001 && stash->hypervisor == HYPERVISOR_XEN) {
       printf("   hypervisor version (0x40000001/eax):\n");
       printf("      version = %d.%d\n", 
