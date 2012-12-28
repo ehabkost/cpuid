@@ -1,0 +1,235 @@
+.\"
+.\" $Id: cpuid.man,v 2.1 2006/01/13 14:24:07 todd $
+.\"
+.TH CPUID 1 "13 January 2006" "V2.1"
+.SH NAME 
+cpuid \- Dump CPUID information for each CPU
+.SH SYNOPSIS
+.B cpuid
+\fI[options...]\fP
+.SH DESCRIPTION
+.I cpuid
+dumps detailed information about the CPU(s) gathered from the CPUID
+instruction, and also determines the exact model of CPU(s) from that
+information.
+
+It dumps all information available from the CPUID instruction.  The exact
+collection of information available varies between manufacturers and even
+between different CPUs from a single manufacturer.  The following information
+is available consistently on all modern CPUs:
+
+.nf
+	vendor_id
+	version information (1/eax)
+	miscellaneous (1/ebx)
+	feature information (1/ecx)
+.fi
+
+It also uses the available information to determine the exact model of each
+CPU (but see LIMITATIONS below).  The result of that determination is
+provided as (synth) at the end of the dump for each CPU.  The determination
+is based on the following information:
+
+.nf
+	version information (1/eax), processor type
+	version information (1/eax), family
+	version information (1/eax), model
+	version information (1/eax), stepping id
+	version information (1/eax), extended family
+	version information (1/eax), extended model
+	brand id
+	brand
+	extended brand id
+	cache and TLB information (2)
+	Transmeta processor revision ID
+.fi
+
+In addition, a simpler determination of the CPU is performed using only the
+information listed above under version information (1/eax).  It is provided
+as (simple synth) under version information (1/eax).  However, it tends to be
+unable to distinguish between various newer CPUs.
+.SH OPTIONS
+.PP
+.I cpuid
+accepts the following command line argument:
+.TP 8
+.I -1, --one-cpu
+Display information only for the first CPU.  This cuts down on the output on
+a multiprocessor system, and is useful when certain that all CPUs are
+identical.
+.SH LIMITATIONS
+There is no known way to distinguish between some versions of the following
+CPUs:
+
+.nf
+	Intel Pentium II (Deschutes), .25um
+	Intel Pentium II Xeon (Deschutes), .25um
+	Intel Celeron (Deschutes), .25um
+	Intel Mobile Pentium II (Deschutes), .25um
+.fi
+
+There is no known way to distinguish between some versions of the following
+CPUs:
+
+.nf
+	Intel Pentium III (Katmai), .25um
+	Intel Pentium III Xeon (Katmai), .25um
+.fi
+
+Whenever 
+.I cpuid
+is unable to distinguish between multiple CPUs, it will list all 
+possibilities.
+
+Transmeta provides no information on how to recognize Transmeta Crusoe
+TM5700/5900 as distinct from other TM5x00 CPUs, or on how to recognize
+Efficeon CPUs.
+.SH INFORMATION SOURCES
+Information on the CPUID instruction and on specific CPUs is available from
+the following documents from Intel Corporation
+<http://www.intel.com/support/processors/index.htm>, with the specified
+Document Numbers:
+
+.RS
+.br
+241618: Intel Processor Identification and the CPUID Instruction, Application
+Note 485
+.br
+242480: Pentium Processor Specification Update
+.br
+242689: Pentium Pro Processor Specification Update
+.br
+243326: 60- and 66-MHz Pentium Processor Specification Update
+.br
+243337: Intel Pentium II Processor Specification Update
+.br
+243748: Intel Celeron Processor Specification Update
+.br
+243776: Intel Pentium II Xeon Processor Specification Update
+.br
+243887: Mobile Intel Pentium II Processor Specification Update
+.br
+244444: Mobile Intel Celeron Processor at 466 MHz, 433 MHz, 400 MHz, 366 MHz,
+333 MHz, 300 MHz, and 266 MHz Specification Update
+.br
+244453: Intel Pentium III Processor Specification Update
+.br
+244460: Intel Pentium III Xeon Processor Specification Update
+.br
+245306: Mobile Intel Pentium III Processor and Mobile Intel Pentium III 
+Processor-M Specification Update
+.br
+245421: Mobile Intel Celeron Processor (0.18u and 0.13u) Specification Update
+.br
+249199: Intel Pentium 4 Processor Specification Update
+.br
+249678: Intel Xeon Processor Specification Update
+.br
+250721: Mobile Intel Pentium 4 Processor-M Specification Update
+.br
+251309: Mobile Intel Celeron Processor on .13 Micron Process in Micro-FCPGA
+Package Specification Update
+.br
+252665: Intel Pentium M Processor Specification Update
+.br
+253176: Mobile Intel Pentium 4 Processor with 533 MHz System Bus
+Specification Update
+.br
+290741: Intel Xeon Processor MP Specification Update
+.br
+290749: Intel Celeron Processor in the 478-Pin Package Specification Update
+.br
+300303: Intel Celeron M Processor Specification Update
+.br
+302209: Intel Pentium M Processor on 90nm Process with 2-MB L2 Cache
+Specification Update
+.br
+302352: Intel Pentium 4 Processor on 90 nm Process Specification Update
+.br
+302354: Intel Celeron D Processor 3xx Sequence Specification Update
+.br
+302402: Intel Xeon Processor with 800 MHz System Bus
+.br
+302441: Mobile Intel Pentium 4 Processor supporting Hyper-Threading
+Technology on 90-nm process technology Specification Update
+.br
+306752: 64-bit Intel Xeon Processor MP with 1 MB L2 Cache Specification Update
+.br
+306757: 64-bit Intel Xeon Processor MP with up to 8 MB L3 Cache Specification
+Update
+.br
+306832: Intel Pentium Processor Extreme Edition and Intel Pentium D Processor
+Specification Update
+.br
+309159: Dual-Core Intel Xeon Processor 2.80 GHz Specification Update
+.br
+309627: Dual-Core Intel Xeon Processor 7000 Sequence Specification Update
+.RE
+
+Information on the CPUID instruction and on specific CPUs is available from
+the following documents from Advanced Micro Devices, Inc.
+<http://www.amd.com/us-en/Processors/TechnicalResources>, with the specified
+Publication Numbers:
+
+.RS
+.br
+20734: AMD Processor Recognition Application Note
+.br
+21266: AMD-K6 Processor Revision Guide Model 6
+.br
+21641: AMD-K6-2 Processor Revision Guide Model 8
+.br
+21846: AMD-K6 Processor Revision Guide Model 7
+.br
+22473: AMD-K6-III Processor Revision Guide Model 9
+.br
+23614: AMD Athlon Processor Model 4 Revision Guide
+.br
+23865: AMD Duron Processor Model 3 Revision Guide
+.br
+24332: AMD Athlon Processor Model 6 Revision Guide
+.br
+24806: AMD Duron Processor Model 7 Revision Guide
+.br
+25481: CPUID Specification
+.br
+25703: AMD Athlon Processor Model 8 Revision Guide
+.br
+25759: Revision Guide for AMD Athlon 64 and AMD Opteron Processors
+.br
+26094: BIOS and Kernel Developer's Guide for AMD Athlon 64 and AMD Opteron
+Processors
+.br
+27532: AMD Athlon Processor Model 10 Revision Guide
+.RE
+
+Information on the CPUID instruction and on specific CPUs is available
+from the following documents from Transmeta Corporation
+<http://www.transmeta.com/crusoe_docs/Crusoe_CPUID_5-7-02.pdf>:
+
+.RS
+.br
+Processor Recognition, 2002/05/07
+.RE
+
+Also, information is available from the following web site:
+
+.RS
+<http://www.sandpile.org/ia32/cpuid.htm>
+.RE
+.SH COPYRIGHT
+Copyright 2003,2004,2005,2006 by Todd Allen.  All Rights Reserved.
+Permission to use, copy, modify, distribute, and sell this software and its
+documentation for any purpose is hereby granted without fee, provided that
+the above copyright notice appear in all copies and that both the copyright
+notice and this permission notice appear in supporting documentation.
+.PP
+No representations are made about the suitability of this software for any
+purpose.  It is provided ``as is'' without express or implied warranty,
+including but not limited to the warranties of merchantability, fitness for a
+particular purpose, and noninfringement.  In no event shall Todd Allen be
+liable for any claim, damages, or other liability, whether in action of
+contract, tort, or otherwise, arising from, out of, or in connection with
+this software.
+.SH AUTHOR
+Todd Allen <etoddallen@comcast.net>
