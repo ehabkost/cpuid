@@ -1,7 +1,7 @@
 .\"
-.\" $Id: cpuid.man,v 20060806 2006/08/06 20:50:00 todd $
+.\" $Id: cpuid.man,v 20060823 2006/08/23 07:35:00 todd $
 .\"
-.TH CPUID 1 "6 Aug 2006" "20060806"
+.TH CPUID 1 "23 Aug 2006" "20060823"
 .SH NAME 
 cpuid \- Dump CPUID information for each CPU
 .SH SYNOPSIS
@@ -27,8 +27,10 @@ is available consistently on all modern CPUs:
 
 It also uses the available information to determine the exact model of each
 CPU (but see LIMITATIONS below).  The result of that determination is
-provided as (synth) at the end of the dump for each CPU.  The determination
-is based on the following information:
+provided as (synth) at the end of the dump for each CPU.  Similarly, it
+determines the multiprocessing characteristics including the number of cores
+per chip (c) and the number of hyperthreads per core (t).  The determination
+of the model is based on the following information:
 
 .nf
 	version information (1/eax), processor type
@@ -37,17 +39,29 @@ is based on the following information:
 	version information (1/eax), stepping id
 	version information (1/eax), extended family
 	version information (1/eax), extended model
+	feature information (1/ecx), virtual machine extensions
 	brand id (1/ebx)
 	brand (0x80000004)
 	cache and TLB information (2)
+	deterministic cache parameters (4/eax), extra processor cores
 	AMD extended brand id (0x80000001/ebx)
 	Transmeta processor revision ID (0x80860001/ebx & ecx)
 .fi
 
-In addition, a simpler determination of the CPU is performed using only the
-information listed above under version information (1/eax).  It is provided
-as (simple synth) under version information (1/eax).  However, it tends to be
-unable to distinguish between various newer CPUs.
+The determination of the multiprocessing characteristics is based on the
+following information:
+
+.nf
+	feature information (1/edx), hyper-threading / multi-core supported
+	miscellaneous (1/ebx), cpu count
+	deterministic cache parameters (4/eax), extra processor cores on this die
+	AMD Logical CPU cores (0x80000008/ecx), number of logical CPU cores - 1
+.fi
+
+In addition, a simpler and coarser determination of the CPU is performed
+using only the information listed above under version information (1/eax).
+It is provided as (simple synth) under version information (1/eax).  However,
+it tends to be unable to distinguish between various newer CPUs.
 .SH OPTIONS
 .PP
 .I cpuid
@@ -57,6 +71,12 @@ accepts the following command line arguments:
 Display information only for the first CPU.  This cuts down on the output on
 a multiprocessor system, and is useful when certain that all CPUs are
 identical.
+.TP 8
+.I -i, --inst
+Use the CPUID instruction directly instead of the CPUID kernel module.  Often
+this works around erroneous information from the CPUID module, but it works
+on only the current CPU.  This should be OK on uniprocessors or homogeneous
+multiprocessors.  You don't need to be root if you use this option.
 .TP 8
 .I -f \fIFILE\fR, --file=\fIFILE\fR
 Read raw hex information from FILE instead of from executions of the cpuid 

@@ -1102,15 +1102,15 @@ print_synth_intel(const char*   name,
    **    Pentium 4 Processor 6x1 (Cedar Mill)
    **    Pentium Extreme Edition Processor 955 (Presler)
    */
-   XFMSC(   0,  6,  2, dD, "Intel Pentium D Processor 9x0 (Presler B1), 65nm");
+   XFMSC(   0,  6,  2, dD, "Intel Pentium D Processor 9xx (Presler B1), 65nm");
    XFMSC(   0,  6,  2, dP, "Intel Pentium 4 Processor 6x1 (Cedar Mill B1) / Pentium Extreme Edition Processor 955 (Presler B1)");
    XFMS (   0,  6,  2,     "Intel Pentium 4 Processor 6x1 (Cedar Mill B1) / Pentium Extreme Edition Processor 955 (Presler B1) / Pentium D Processor 900 (Presler B1), 65nm");
-   XFMSC(   0,  6,  4, dD, "Intel Pentium D Processor 9x0 (Presler C1), 65nm");
+   XFMSC(   0,  6,  4, dD, "Intel Pentium D Processor 9xx (Presler C1), 65nm");
    XFMSC(   0,  6,  4, dP, "Intel Pentium 4 Processor 6x1 (Cedar Mill C1) / Pentium Extreme Edition Processor 955 (Presler C1)");
    XFMSC(   0,  6,  4, dC, "Intel Celeron D Processor 3xx (Cedar Mill C1), 65nm");
    XFMSC(   0,  6,  4, sX, "Intel Xeon Processor 5000 (Dempsey C1), 65nm");
-   XFMS (   0,  6,  4,     "Intel Pentium 4 Processor 6x1 (Cedar Mill C1) / Pentium Extreme Edition Processor 955 (Presler C1) / Intel Pentium D Processor 9x0 (Presler C1), 65nm / Intel Xeon Processor 5000 (Dempsey C1) / Celeron D Processor 3xx (Cedar Mill C1), 65nm");
-   XFMC (   0,  6,     dD, "Intel Pentium D Processor 9x0 (Presler), 65nm");
+   XFMS (   0,  6,  4,     "Intel Pentium 4 Processor 6x1 (Cedar Mill C1) / Pentium Extreme Edition Processor 955 (Presler C1) / Intel Pentium D Processor 9xx (Presler C1), 65nm / Intel Xeon Processor 5000 (Dempsey C1) / Celeron D Processor 3xx (Cedar Mill C1), 65nm");
+   XFMC (   0,  6,     dD, "Intel Pentium D Processor 9xx (Presler), 65nm");
    XFMC (   0,  6,     dP, "Intel Pentium 4 Processor 6x1 (Cedar Mill) / Pentium Extreme Edition Processor 955 (Presler)");
    XFMC (   0,  6,     dC, "Intel Celeron D Processor 3xx (Cedar Mill), 65nm");
    XFMC (   0,  6,     sX, "Intel Xeon Processor 5000 (Dempsey), 65nm");
@@ -3128,61 +3128,6 @@ print_c0000001_edx(unsigned int  value)
                /* max_len => */ 0);
 }
 
-static int read_reg (int           cpuid_fd,
-                     unsigned int  reg,
-                     unsigned int  words[],
-                     boolean       quiet)
-{
-   int  status;
-
-#if defined(i386)
-   loff_t  result;
-   status = _llseek(cpuid_fd, 0, reg, &result, SEEK_SET);
-#else
-   status = lseek(cpuid_fd, reg, SEEK_SET);
-#endif
-   if (status == -1) {
-      if (quiet) {
-         return FALSE;
-      } else {
-         fprintf(stderr,
-                 "%s: unable to seek cpuid file to offset 0x%08x;"
-                 " errno = %d (%s)\n",
-                 program, reg, errno, strerror(errno));
-         exit(1);
-      }
-   }
-
-   status = read(cpuid_fd, words, 16);
-   if (status == -1) {
-      if (quiet) {
-         return FALSE;
-      } else {
-         fprintf(stderr,
-                 "%s: unable to read cpuid file at offset 0x%08x;"
-                 " errno = %d (%s)\n",
-                 program, reg, errno, strerror(errno));
-         exit(1);
-      }
-   }
-
-   return TRUE;
-}
-
-#define WORD_EAX  0
-#define WORD_EBX  1
-#define WORD_ECX  2
-#define WORD_EDX  3
-
-#define WORD_NUM  4
-
-#define FOUR_CHARS_VALUE(s) \
-   ((unsigned int)((s)[0] + ((s)[1] << 8) + ((s)[2] << 16) + ((s)[3] << 24)))
-#define IS_VENDOR_ID(words, s)                        \
-   (   (words)[WORD_EBX] == FOUR_CHARS_VALUE(&(s)[0]) \
-    && (words)[WORD_EDX] == FOUR_CHARS_VALUE(&(s)[4]) \
-    && (words)[WORD_ECX] == FOUR_CHARS_VALUE(&(s)[8]))
-
 static void
 usage(void)
 {
@@ -3197,6 +3142,16 @@ usage(void)
    printf("   -h, -H,  --help       display this help information\n");
    printf("   -1,      --one-cpu    display information only for the first"
                                     " CPU\n");
+   printf("   -i,      --inst       use the CPUID instruction directly instead"
+                                    " of the CPUID\n");
+   printf("                         kernel module: Often this works around"
+                                    " erroneous\n");
+   printf("                         information from the CPUID module, but it"
+                                    " works on only\n");
+   printf("                         the current CPU.  This should be OK"
+                                    " on uniprocessors\n");
+   printf("                         or homogeneous multiprocessors.  Need not"
+                                    " be root.\n");
    printf("   -f FILE, --file=FILE  read raw hex information (-r output) from"
                                     " FILE instead\n");
    printf("                         of from executions of the cpuid"
@@ -3218,6 +3173,8 @@ explain_errno(void)
       fprintf(stderr,
               "%s: wait a few seconds, and then try again\n",
               program);
+      fprintf(stderr,
+              "%s: or consider using the -i option\n", program);
    } else if (errno == ENOENT) {
       fprintf(stderr,
               "%s: if running a modular kernel, execute"
@@ -3241,89 +3198,32 @@ explain_errno(void)
       fprintf(stderr,
               "%s: and then try again\n",
               program);
+      fprintf(stderr,
+              "%s: or consider using the -i option\n", program);
    } else if ((errno == EPERM || errno == EACCES) && getuid() != 0) {
       fprintf(stderr,
               "%s: on most systems,"
               " it is necessary to execute this as root\n",
               program);
+      fprintf(stderr,
+              "%s: or consider using the -i option\n", program);
    }
    exit(1);
 }
 
-static int
-open_file(unsigned int cpu)
-{
-   int    cpuid_fd = -1;
-   char   cpuid_name[20];
+#define WORD_EAX  0
+#define WORD_EBX  1
+#define WORD_ECX  2
+#define WORD_EDX  3
 
-   if (cpuid_fd == -1 && cpu == 0) {
-      cpuid_fd = open("/dev/cpuid", O_RDONLY);
-      if (cpuid_fd == -1 && errno != ENOENT) {
-         fprintf(stderr, 
-                 "%s: cannot open /dev/cpuid; errno = %d (%s)\n", 
-                 program, errno, strerror(errno));
-         explain_errno();
-      }
-   }
+#define WORD_NUM  4
 
-   if (cpuid_fd == -1) {
-      sprintf(cpuid_name, "/dev/cpu/%u/cpuid", cpu);
-      cpuid_fd = open(cpuid_name, O_RDONLY);
-      if (cpuid_fd == -1) {
-         if (cpu > 0) {
-            if (errno == ENXIO)  return -1;
-            if (errno == ENODEV) return -1;
-         }
-         if (errno != ENOENT) {
-            fprintf(stderr, 
-                    "%s: cannot open /dev/cpuid or %s; errno = %d (%s)\n", 
-                    program, cpuid_name, errno, strerror(errno));
-            explain_errno();
-         }
-      }
-   }
-
-   if (cpuid_fd == -1) {
-      /*
-      ** Lots of Linux's omit the /dev/cpuid or /dev/cpu/%u/cpuid files.  Try
-      ** creating a temporary file with mknod.
-      **
-      ** mkstemp is of absolutely no security value here because I can't use
-      ** the actual file it generates, and have to delete it and re-create it
-      ** with mknod.  But I have to use it anyway to eliminate errors from
-      ** smartypants gcc/glibc during the link if I attempt to use tempnam.
-      */
-      char  tmpname[20];
-      int   dummy_fd;
-      strcpy(tmpname, "/tmp/cpuidXXXXXX");
-      dummy_fd = mkstemp(tmpname);
-      if (dummy_fd != -1) {
-         close(dummy_fd);
-         remove(tmpname);
-         {
-            int  status = mknod(tmpname,
-                                (S_IFCHR | S_IRUSR),
-                                makedev(CPUID_MAJOR, cpu));
-            if (status == 0) {
-               cpuid_fd = open(tmpname, O_RDONLY);
-               remove(tmpname);
-            }
-         }
-      }
-      if (cpuid_fd == -1) {
-         if (cpu > 0) {
-            if (errno == ENXIO)  return -1;
-            if (errno == ENODEV) return -1;
-         }
-         fprintf(stderr, 
-                 "%s: cannot open /dev/cpuid or %s; errno = %d (%s)\n", 
-                 program, cpuid_name, errno, strerror(errno));
-         explain_errno();
-      }
-   }
-
-   return cpuid_fd;
-}
+#define FOUR_CHARS_VALUE(s) \
+   ((unsigned int)((s)[0] + ((s)[1] << 8) + ((s)[2] << 16) + ((s)[3] << 24)))
+#define IS_VENDOR_ID(words, s)                        \
+   (   (words)[WORD_EBX] == FOUR_CHARS_VALUE(&(s)[0]) \
+    && (words)[WORD_EDX] == FOUR_CHARS_VALUE(&(s)[4]) \
+    && (words)[WORD_ECX] == FOUR_CHARS_VALUE(&(s)[8]))
 
 static void
 print_reg_raw (unsigned int        reg,
@@ -3509,8 +3409,142 @@ print_reg (unsigned int        reg,
    }
 }
 
+#define USE_INSTRUCTION  (-2)
+
+static int
+real_setup(unsigned int  cpu,
+           boolean       inst)
+{
+   if (inst) {
+      return USE_INSTRUCTION;
+   } else {
+      int    cpuid_fd = -1;
+      char   cpuid_name[20];
+
+      if (cpuid_fd == -1 && cpu == 0) {
+         cpuid_fd = open("/dev/cpuid", O_RDONLY);
+         if (cpuid_fd == -1 && errno != ENOENT) {
+            fprintf(stderr, 
+                    "%s: cannot open /dev/cpuid; errno = %d (%s)\n", 
+                    program, errno, strerror(errno));
+            explain_errno();
+         }
+      }
+
+      if (cpuid_fd == -1) {
+         sprintf(cpuid_name, "/dev/cpu/%u/cpuid", cpu);
+         cpuid_fd = open(cpuid_name, O_RDONLY);
+         if (cpuid_fd == -1) {
+            if (cpu > 0) {
+               if (errno == ENXIO)  return -1;
+               if (errno == ENODEV) return -1;
+            }
+            if (errno != ENOENT) {
+               fprintf(stderr, 
+                       "%s: cannot open /dev/cpuid or %s; errno = %d (%s)\n", 
+                       program, cpuid_name, errno, strerror(errno));
+               explain_errno();
+            }
+         }
+      }
+
+      if (cpuid_fd == -1) {
+         /*
+         ** Lots of Linux's omit the /dev/cpuid or /dev/cpu/%u/cpuid files.
+         ** Try creating a temporary file with mknod.
+         **
+         ** mkstemp is of absolutely no security value here because I can't
+         ** use the actual file it generates, and have to delete it and
+         ** re-create it with mknod.  But I have to use it anyway to
+         ** eliminate errors from smartypants gcc/glibc during the link if I
+         ** attempt to use tempnam.
+         */
+         char  tmpname[20];
+         int   dummy_fd;
+         strcpy(tmpname, "/tmp/cpuidXXXXXX");
+         dummy_fd = mkstemp(tmpname);
+         if (dummy_fd != -1) {
+            close(dummy_fd);
+            remove(tmpname);
+            {
+               int  status = mknod(tmpname,
+                                   (S_IFCHR | S_IRUSR),
+                                   makedev(CPUID_MAJOR, cpu));
+               if (status == 0) {
+                  cpuid_fd = open(tmpname, O_RDONLY);
+                  remove(tmpname);
+               }
+            }
+         }
+         if (cpuid_fd == -1) {
+            if (cpu > 0) {
+               if (errno == ENXIO)  return -1;
+               if (errno == ENODEV) return -1;
+            }
+            fprintf(stderr, 
+                    "%s: cannot open /dev/cpuid or %s; errno = %d (%s)\n", 
+                    program, cpuid_name, errno, strerror(errno));
+            explain_errno();
+         }
+      }
+
+      return cpuid_fd;
+   }
+}
+
+static int real_get (int           cpuid_fd,
+                     unsigned int  reg,
+                     unsigned int  words[],
+                     boolean       quiet)
+{
+   if (cpuid_fd == USE_INSTRUCTION) {
+     asm("cpuid"
+         : "=a" (words[WORD_EAX]),
+           "=b" (words[WORD_EBX]),
+           "=c" (words[WORD_ECX]),
+           "=d" (words[WORD_EDX])
+         : "a" (reg));
+   } else {
+      int  status;
+
+#if defined(i386)
+      loff_t  result;
+      status = _llseek(cpuid_fd, 0, reg, &result, SEEK_SET);
+#else
+      status = lseek(cpuid_fd, reg, SEEK_SET);
+#endif
+      if (status == -1) {
+         if (quiet) {
+            return FALSE;
+         } else {
+            fprintf(stderr,
+                    "%s: unable to seek cpuid file to offset 0x%08x;"
+                    " errno = %d (%s)\n",
+                    program, reg, errno, strerror(errno));
+            exit(1);
+         }
+      }
+
+      status = read(cpuid_fd, words, 16);
+      if (status == -1) {
+         if (quiet) {
+            return FALSE;
+         } else {
+            fprintf(stderr,
+                    "%s: unable to read cpuid file at offset 0x%08x;"
+                    " errno = %d (%s)\n",
+                    program, reg, errno, strerror(errno));
+            exit(1);
+         }
+      }
+   }
+
+   return TRUE;
+}
+
 static void
 do_real(boolean  one_cpu,
+        boolean  inst,
         boolean  raw)
 {
    unsigned int  cpu;
@@ -3523,7 +3557,7 @@ do_real(boolean  one_cpu,
 
       if (one_cpu && cpu > 0) break;
 
-      cpuid_fd = open_file(cpu);
+      cpuid_fd = real_setup(cpu, inst);
       if (cpuid_fd == -1) break;
 
       printf("CPU %u:\n", cpu);
@@ -3532,7 +3566,7 @@ do_real(boolean  one_cpu,
       for (reg = 0; reg <= basic_max; reg++) {
          unsigned int  words[WORD_NUM];
 
-         read_reg(cpuid_fd, reg, words, FALSE);
+         real_get(cpuid_fd, reg, words, FALSE);
 
          if (reg == 0) {
             basic_max = words[WORD_EAX];
@@ -3552,7 +3586,7 @@ do_real(boolean  one_cpu,
                try++;
                if (try >= max_tries) break;
 
-               read_reg(cpuid_fd, reg, words, FALSE);
+               real_get(cpuid_fd, reg, words, FALSE);
             } while (try < max_tries);
          } else {
             print_reg(reg, words, raw, 0, &stash);
@@ -3564,7 +3598,7 @@ do_real(boolean  one_cpu,
          boolean       success;
          unsigned int  words[WORD_NUM];
 
-         success = read_reg(cpuid_fd, reg, words, TRUE);
+         success = real_get(cpuid_fd, reg, words, TRUE);
          if (!success) break;
 
          if (reg == 0x80000000) {
@@ -3579,7 +3613,7 @@ do_real(boolean  one_cpu,
          boolean       success;
          unsigned int  words[WORD_NUM];
 
-         success = read_reg(cpuid_fd, reg, words, TRUE);
+         success = real_get(cpuid_fd, reg, words, TRUE);
          if (!success) break;
 
          if (reg == 0x80860000) {
@@ -3594,7 +3628,7 @@ do_real(boolean  one_cpu,
          boolean       success;
          unsigned int  words[WORD_NUM];
 
-         success = read_reg(cpuid_fd, reg, words, TRUE);
+         success = real_get(cpuid_fd, reg, words, TRUE);
          if (!success) break;
 
          if (reg == 0xc0000000) {
@@ -3709,16 +3743,18 @@ int
 main(int     argc,
      string  argv[])
 {
-   static ccstring             shortopts  = "+hH1rf:";
+   static ccstring             shortopts  = "+hH1irf:";
    static const struct option  longopts[] = {
       { "help",    no_argument,       NULL, 'h'  },
       { "one-cpu", no_argument,       NULL, '1'  },
+      { "inst",    no_argument,       NULL, 'i'  },
       { "raw",     no_argument,       NULL, 'r'  },
       { "file",    required_argument, NULL, 'f'  },
       { NULL,      no_argument,       NULL, '\0' }
    };
 
    boolean  opt_one_cpu  = FALSE;
+   boolean  opt_inst     = FALSE;
    boolean  opt_raw      = FALSE;
    cstring  opt_filename = NULL;
 
@@ -3743,6 +3779,10 @@ main(int     argc,
          usage();
          /*NOTREACHED*/
       case '1':
+         opt_one_cpu = TRUE;
+         break;
+      case 'i':
+         opt_inst    = TRUE;
          opt_one_cpu = TRUE;
          break;
       case 'r':
@@ -3774,7 +3814,7 @@ main(int     argc,
    if (opt_filename != NULL) {
       do_file(opt_filename, opt_one_cpu, opt_raw);
    } else {
-      do_real(opt_one_cpu, opt_raw);
+      do_real(opt_one_cpu, opt_inst, opt_raw);
    }
 
    exit(0);

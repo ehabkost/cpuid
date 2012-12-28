@@ -1,3 +1,18 @@
+Wed Aug 23 2006 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+
+Tue Aug 22 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c, cpuid.man: Added -i option to use the CPUID instruction 
+	  directly instead of the CPUID kernel module.
+	* cpuid.c: Generate Pentium Processor 9x0 to 9xx because of 9x5 
+	  processors.
+	* cpuid.man: Updated information about determining synthesized model 
+	  information, and added information about determining synthesized
+	  multiprocessor information.
+
+Mon Aug  7 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.proto.spec: Change URL to cpuid-specific page.
+
 Sun Aug  6 2006 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 

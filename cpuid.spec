@@ -1,4 +1,4 @@
-%define version 20060806
+%define version 20060823
 %define release 1
 Summary: dumps CPUID information about the CPU(s)
 Name: cpuid
@@ -8,7 +8,7 @@ Copyright: BSD
 Group: System Environment/Base
 Source: cpuid-%{version}.src.tar.gz
 Packager: Todd Allen <cpuid@etallen.com>
-URL: http://www.etallen.com
+URL: http://www.etallen.com/cpuid.html
 %description
 cpuid dumps detailed information about the CPU(s) gathered from the CPUID 
 instruction, and also determines the exact model of CPU(s).
