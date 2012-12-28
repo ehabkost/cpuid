@@ -1,4 +1,4 @@
-%define version 20060403
+%define version 20060730
 %define release 1
 Summary: dumps CPUID information about the CPU(s)
 Name: cpuid
@@ -26,6 +26,7 @@ make install BUILDROOT=${RPM_BUILD_ROOT}
 rm -rf $RPM_BUILD_DIR/$RPM_PACKAGE_NAME-$RPM_PACKAGE_VERSION
 
 %files
+%defattr(-,root,root)
 /usr/bin/cpuid
 /usr/share/man/man1/cpuid.1.gz
 %doc ChangeLog FUTURE LICENSE

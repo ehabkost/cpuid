@@ -1,23 +1,69 @@
+Sun Jul 30 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Fixed "deterministic cache parameters (4)", so that its
+	  children aren't staggered.
+	* cpuid.c: Corrected Venice and Palermo processors with DH-E3 and
+	  DH-E6 steppings that had been reported as Toledo processors
+	  incorrectly.
+	* cpuid.c: Corrected codename for the Athlon Thoroughbred's Duron
+	  counterpart: Applebred.
+	* cpuid.c: Added code to distinguish Athlon XP Thortons from Bartons,
+	  based on L2 cache size.
+	* cpuid.c: Added code to distinguish Athlon 64 X2 Manchester E6 from
+	  Athlon 64 X2 Toledo.
+	* cpuid.c: Added Celeron Yonah C0.
+	* cpuid.c: Added Core Yonah D0.
+	* cpuid.c: Added Xeon Nocona R0 / Irwindale R0 stepping.
+	* cpuid.c: Added Pentium 4 Cedar Mill C1, Pentium D Presler C1, and 
+	  Xeon Dempsey C1.
+	* cpuid.c: Added Xeon Woodcrest B2.
+	* cpuid.c: Added Core 2 Conroe B1 & B2 & Core 2 Extreme Processor B1 & 
+	  B2.
+	* cpuid.c: Updated Itanium2 processors.
+
+Wed Jul 26 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: In decode_brand, added check for "Athlon(TM) XP", equivalent 
+	  to "Athlon(tm) XP".
+	* cpuid.c: Fixed "80000002" typo in print_80860002_eax().  
+
+Mon Jul 24 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Distinguish properly between Core Solo, Core Duo, and
+	  Xeon Processor LV.  Reorganized multi-processor decoding to
+	  support that.
+
+Sun Jul 23 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Fixed emission of raw values for cpuid code 2.
+	* cpuid.c: Added -f file option to read raw hexadecimal input from a
+	  file and parse it instead of executing the cpuid instruction, and
+	  code reorganization to support this.
+
+Mon May 22 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Fixed "unrecogninzed" typo in error.
+
+Fri Apr  7 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.proto.spec: Added %defattr so that the files in the rpm's are
+	  owned by "root" and not "todd".  (Why did no one scream bloody murder
+	  about this before?)
+
 Mon Apr  3 2006 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
 	* cpuid.c: Added code to distinguish between the two different Dual-Core
-	Xeon (Paxville A0) and Dual-Core Xeon Processor 7000 (Paxville A0).  
-	Empirically, the significant differences are the VMX flag and the
-	"execution disable" flag.  The VMX flag is in an Intel-defined
-	CPUID function, so it's used.  Thanks to Jason Nicholls for providing
-	the Dual-Core Xeon (Paxville A0) output that made this possible.
+	  Xeon (Paxville A0) and Dual-Core Xeon Processor 7000 (Paxville A0).  
+	  Empirically, the significant differences are the VMX flag and the
+	  "execution disable" flag.  The VMX flag is in an Intel-defined
+	  CPUID function, so it's used.  Thanks to Jason Nicholls for providing
+	  the Dual-Core Xeon (Paxville A0) output that made this possible.
 	* cpuid.c: Added detection for Xeon Processor LV (Sossaman C0).
 
 Mon Mar 13 2006 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
 	* cpuid.c: Fixed code that distinguished processors based on
 	  presence or absence of L3 cache.  Some of the cache codes weren't
 	  being recognized as L3 cache.
 
 Sun Feb 26 2006 Todd Allen <todd.allen@etallen.com>
-
 	* Made new release.
 
 Wed Feb 22 2006 Todd Allen <todd.allen@etallen.com>
-
 	* cpuid.c: Added VMX: virtual machine extensions to CPUID function 1,
 	  register ecx.
 	* cpuid.c: Added SVM LBR virtualization to CPUID function 8000000a,
@@ -25,7 +71,6 @@ Wed Feb 22 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Fixed cut & paste header error in print_8000000a_eax.
 
 Tue Feb 21 2006 Todd Allen <todd.allen@etallen.com>
-
 	* cpuid.c: Renamed "hyper-threading technology" field to 
 	  "hyper-threading / multi-core supported" to eliminate some confusing
 	  situations, such as Northwood chips which nominally support hyper-
@@ -37,7 +82,7 @@ Tue Feb 21 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Added Processor Number info to Smithfield processors.
 
 Wed Feb  8 2006 Todd Allen <todd.allen@etallen.com>
-
+	* Made new release.
 	* cpuid.c: Use defined(i386) instead of __LONG_MAX__ to determine
 	  whether or not it's necessary to use _llseek().  Fixes handling of 
 	  functions >= 2**31 on some build systems, like the one I used to 
@@ -49,7 +94,7 @@ Wed Feb  8 2006 Todd Allen <todd.allen@etallen.com>
 	  man page).
 
 Tue Feb  7 2006 Todd Allen <todd.allen@etallen.com>
-
+	* Made new release.
 	* cpuid.c: Correctly distinguish Egypt/Italy processors.
 	* cpuid.c: Fixed minor problems in error checking in open_file().
 	* cpuid.spec: Fixed bad Packager field.
@@ -65,5 +110,4 @@ Tue Feb  7 2006 Todd Allen <todd.allen@etallen.com>
 	  %release.
 
 Mon Feb  6 2006 Todd Allen <todd.allen@etallen.com>
-
 	* Initial public release.

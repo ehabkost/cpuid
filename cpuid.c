@@ -47,6 +47,7 @@ typedef int   boolean;
 #define FALSE 0
 
 typedef char*              string;
+typedef const char*        cstring;
 typedef const char* const  ccstring;
 #define SAME  0
 
@@ -221,9 +222,20 @@ typedef enum {
 ** s? = think "server" (multiprocessor)
 ** M? = think "mobile"
 ** D? = think "dual core"
+**
+** ?P = think Pentium
+** ?X = think Xeon
+** ?M = think Xeon MP
+** ?C = think Celeron
+** ?c = think Core
+** ?A = think Athlon
+** ?D = think Duron
+** ?S = think Sempron
+** ?O = think Opteron
+** ?T = think Turion
 */
 typedef enum {
-       /* ==========Intel==========   ============AMD============   Transmeta */
+       /* ==========Intel==========  ============AMD============    Transmeta */
    UN, /*        Unknown                                                      */
    dP, /*        Pentium                                                      */
    MP, /* Mobile Pentium                                                      */
@@ -236,23 +248,27 @@ typedef enum {
    dC, /*        Celeron                                                      */
    MC, /* Mobile Celeron                                                      */
    nC, /* not    Celeron                                                      */
-   dO, /*                                       Opteron                       */
-   d8, /*                                       Opteron (8xx)                 */
-   dX, /*                                       Athlon XP                     */
-   MX, /*                             mobile    Athlon XP-M                   */
-   ML, /*                             mobile    Athlon XP-M (LV)              */
-   dA, /*                                       Athlon(64)                    */
-   sA, /*                                       Athlon MP                     */
-   MA, /*                             mobile    Athlon(64)                    */
-   dF, /*                                       Athlon 64 FX                  */
-   dD, /*                                       Duron                         */
-   sD, /*        Pentium D                      Duron MP                      */
-   MD, /*                             mobile    Duron                         */
-   dS, /*                                       Sempron                       */
-   MS, /*                             mobile    Sempron                       */
-   DO, /*                             Dual Core Opteron                       */
-   D8, /*                             Dual Core Opteron (8xx)                 */
-   MT, /*                             mobile    Turion                        */
+   dc, /*        Core Solo                                                    */
+   Dc, /*        Core Duo                                                     */
+   dO, /*                                      Opteron                        */
+   d8, /*                                      Opteron (8xx)                  */
+   dX, /*                                      Athlon XP                      */
+   dt, /*                                      Athlon XP (Thorton)            */
+   MX, /*                            mobile    Athlon XP-M                    */
+   ML, /*                            mobile    Athlon XP-M (LV)               */
+   dA, /*                                      Athlon(64)                     */
+   dm, /*                                      Athlon(64) (Manchester)        */
+   sA, /*                                      Athlon MP                      */
+   MA, /*                            mobile    Athlon(64)                     */
+   dF, /*                                      Athlon 64 FX                   */
+   dD, /*                                      Duron                          */
+   sD, /*        Pentium D                     Duron MP                       */
+   MD, /*                            mobile    Duron                          */
+   dS, /*                                      Sempron                        */
+   MS, /*                            mobile    Sempron                        */
+   DO, /*                            Dual Core Opteron                        */
+   D8, /*                            Dual Core Opteron (8xx)                  */
+   MT, /*                            mobile    Turion                         */
    t2, /*                                                           TMx200    */
    t4, /*                                                           TMx400    */
    t5, /*                                                           TMx500    */
@@ -274,6 +290,12 @@ typedef struct {
    unsigned char  brand[48];
    unsigned char  transmeta_info[48];
 
+   struct mp {
+      boolean        ok;
+      unsigned int   cores;
+      unsigned int   hyperthreads;
+   } mp;
+
                                 /* ==============implications============== */
                                 /* PII (F6, M5)            PIII (F6, M7)    */
                                 /* ----------------------  ---------------  */
@@ -287,10 +309,16 @@ typedef struct {
 
    boolean       L2_2M;         /* Nocona lacks, Irwindale has */
    boolean       L3;            /* Cranford lacks, Potomac has */
+
+   boolean       L2_256K;       /* Barton has more, Thorton has this */
+   boolean       L2_512K;       /* Toledo has more, Manchester E6 has this */
 } code_stash_t;
 
 #define NIL_STASH { VENDOR_UNKNOWN, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "",  \
-                    FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE }
+                    { FALSE, 0, 0 }, \
+                    FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, \
+                    FALSE, FALSE, \
+                    FALSE, FALSE }
 
 static void
 stash_intel_cache(code_stash_t*  stash,
@@ -332,6 +360,27 @@ stash_intel_cache(code_stash_t*  stash,
    case 0x8a:
    case 0x8d:
       stash->L3 = TRUE;
+      break;
+   }
+
+   switch (value) {
+   case 0x3c:
+   case 0x42:
+   case 0x7a:
+   case 0x7e:
+   case 0x82:
+      stash->L2_256K = TRUE;
+      break;
+   }
+
+   switch (value) {
+   case 0x3e:
+   case 0x43:
+   case 0x7b:
+   case 0x7f:
+   case 0x83:
+   case 0x86:
+      stash->L2_512K = TRUE;
       break;
    }
 }
@@ -438,6 +487,8 @@ decode_brand(const code_stash_t*  stash)
             return dD;
          } else if (strstr(brand, "Pentium") != NULL) {
             return dP;
+         } else if (strstr(brand, "Genuine Intel(R) CPU") != NULL) {
+            return dc;
          }
       }
       return UN;
@@ -463,7 +514,8 @@ decode_brand(const code_stash_t*  stash)
       } else {
          if (strstr(brand, "Dual Core") != NULL) {
             return DO;
-         } else if (strstr(brand, "Athlon(tm) XP") != NULL) {
+         } else if (strstr(brand, "Athlon(tm) XP") != NULL
+                    || strstr(brand, "Athlon(TM) XP") != NULL) {
             return dX;
          } else if (strstr(brand, "Athlon(tm) 64 FX") != NULL) {
             return dF;
@@ -590,6 +642,26 @@ specialize_intel_VT(code_t               result,
 }
 
 static code_t
+specialize_intel_mp(code_t               result,
+                    const code_stash_t*  stash)
+{
+   if (stash->vendor == VENDOR_INTEL) {
+      switch (result) {
+      case dc:
+         if (stash->mp.cores == 2) {
+            result = Dc;
+         }
+         break;
+      default:
+         /* DO NOTHING */
+         break;
+      }
+   }
+
+   return result;
+}
+
+static code_t
 specialize_amd_model(code_t               result,
                      const code_stash_t*  stash)
 {
@@ -668,6 +740,39 @@ specialize_amd_model(code_t               result,
 }
 
 static code_t
+specialize_amd_cache(code_t               result,
+                     const code_stash_t*  stash)
+{
+   if (stash->vendor == VENDOR_AMD) {
+      switch (result) {
+      case dX:
+         switch (__FMS(stash->val_1_eax)) {
+         case _F(6) + _M(10) + _S(0):
+            if (stash->L2_256K) {
+               /* to distinguish Thorton from Barton */
+               result = dt;
+            }
+         }
+         break;
+      case dA:
+         switch (__XFXM(stash->val_1_eax)) {
+         case _XF(0) + _F(15) + _XM(2) + _M(3):
+            if (stash->L2_512K) {
+               /* to distinguish Manchester E6 from Toledo */
+               result = dm;
+            }
+         }
+         break;
+      default:
+         /* DO NOTHING */
+         break;
+      }
+   }
+
+   return result;
+}
+
+static code_t
 decode(const code_stash_t*  stash)
 {
    code_t  result;
@@ -682,7 +787,9 @@ decode(const code_stash_t*  stash)
 
    result = specialize_intel_cache(result, stash);
    result = specialize_intel_VT(result, stash);
+   result = specialize_intel_mp(result, stash);
    result = specialize_amd_model(result, stash);
+   result = specialize_amd_cache(result, stash);
 
    return result;
 }
@@ -845,11 +952,32 @@ print_synth_intel(const char*   name,
    ** Is MP the correct code for:
    **    Intel Core Solo (Yonah C0) / Core Duo (Yonah C0)?
    */
-   FMSC (   6, 14,  8, MP, "Intel Core Solo (Yonah C0) / Core Duo (Yonah C0), 65nm");
+   FMSC (   6, 14,  8, dc, "Intel Core Solo (Yonah C0), 65nm");
+   FMSC (   6, 14,  8, Dc, "Intel Core Duo (Yonah C0), 65nm");
+   FMSC (   6, 14,  8, dC, "Intel Celeron (Yonah C0), 65nm");
    FMSC (   6, 14,  8, sX, "Intel Xeon Processor LV (Sossaman C0), 65nm");
-   FMS  (   6, 14,  8,     "Intel Core Solo (Yonah C0) / Core Duo (Yonah C0) / Xeon Processor LV (Sossaman C0), 65nm");
-   FM   (   6, 14,         "Intel Core Solo (Yonah) / Core Duo (Yonah) / Xeon Processor LV (Sossaman), 65nm");
-   F    (   6,             "Intel Pentium II / Pentium III / Pentium M / Celeron / Mobile Celeron / Celeron M / Core Solo / Core Duo (unknown model)");
+   FMS  (   6, 14,  8,     "Intel Core Solo (Yonah C0) / Core Duo (Yonah C0) / Xeon Processor LV (Sossaman C0) / Celeron (Yonah C0), 65nm");
+   FMSC (   6, 14, 12, dc, "Intel Core Solo (Yonah D0), 65nm");
+   FMSC (   6, 14, 12, Dc, "Intel Core Duo (Yonah D0), 65nm");
+   FMS  (   6, 14, 12,     "Intel Core Solo (Yonah D0) / Core Duo (Yonah D0), 65nm");
+   FMC  (   6, 14,     dc, "Intel Core Solo (Yonah), 65nm");
+   FMC  (   6, 14,     Dc, "Intel Core Duo (Yonah), 65nm");
+   FMC  (   6, 14,     sX, "Intel Xeon Processor LV (Sossaman), 65nm");
+   FMC  (   6, 14,     dC, "Intel Celeron (Yonah), 65nm");
+   FM   (   6, 14,         "Intel Core Solo (Yonah) / Core Duo (Yonah) / Xeon Processor LV (Sossaman) / Celeron (Yonah), 65nm");
+   FMS  (   6, 15,  5,     "Intel Core 2 Duo (Conroe B1) / Core 2 Extreme Processor (Conroe B1)");
+   /*
+   ** How to distinguish?
+   **    Core 2 Duo (Conroe B2)
+   **    Core 2 Extreme Processor (Conroe B2)
+   */
+   FMSC (   6, 15,  6, dc, "Intel Core 2 Duo (Conroe B2) / Core 2 Extreme Processor (Conroe B2)");
+   FMSC (   6, 15,  6, sX, "Intel Dual-Core Xeon Processor 5100 (Woodcrest B2), 65nm");
+   FMS  (   6, 15,  6,     "Intel Core 2 Duo (Conroe B2) / Core 2 Extreme Processor (Conroe B2) / Dual-Core Xeon Processor 5100 (Woodcrest B2), 65nm");
+   FMC  (   6, 15,     dc, "Intel Core 2 Duo (Conroe) / Core 2 Extreme Processor (Conroe)");
+   FMC  (   6, 15,     sX, "Intel Dual-Core Xeon Processor 5100 (Woodcrest), 65nm");
+   FM   (   6, 15,         "Intel Core 2 Duo (Conroe) / Core 2 Extreme Processor (Conroe) / Dual-Core Xeon Processor 5100 (Woodcrest), 65nm");
+   F    (   6,             "Intel Pentium II / Pentium III / Pentium M / Celeron / Mobile Celeron / Celeron M / Core Solo / Core Duo / Core 2 / Core 2 Extreme Processor / Xeon Processor LV / Xeon Processor 5100 (unknown model)");
    FMS  (   7,  6,  4,     "Intel Itanium (C0)");
    FMS  (   7,  7,  4,     "Intel Itanium (C1)");
    FMS  (   7,  8,  4,     "Intel Itanium (C2)");
@@ -922,6 +1050,11 @@ print_synth_intel(const char*   name,
    XFMSC(   0,  4,  3, sX, "Intel Xeon (Nocona N0), 90nm");
    XFMSC(   0,  4,  3, sI, "Intel Xeon (Irwindale N0), 90nm");
    XFMS (   0,  4,  3,     "Intel Pentium 4 (Prescott N0) / Xeon (Nocona N0 / Irwindale N0), 90nm");
+   /*
+   ** How to distinguish?
+   **    Pentium D Processor 8x1 (Smithfield)
+   **    Pentium Extreme Edition 840 (Smithfield)
+   */
    XFMS (   0,  4,  4,     "Intel Pentium D Processor 8x0 (Smithfield A0) / Pentium Extreme Edition Processor 840 (Smithfield A0), 90nm");
    XFMS (   0,  4,  7,     "Intel Pentium D Processor 8x0 (Smithfield B0) / Pentium Extreme Edition Processor 840 (Smithfield B0), 90nm");
    XFMSC(   0,  4,  8, sX, "Intel Dual-Core Xeon (Paxville A0), 90nm");
@@ -931,30 +1064,50 @@ print_synth_intel(const char*   name,
    XFMSC(   0,  4,  9, sM, "Intel Xeon MP (Cranford B0), 90nm");
    XFMSC(   0,  4,  9, dC, "Intel Celeron D (Prescott G1), 90nm");
    XFMS (   0,  4,  9,     "Intel Pentium 4 (Prescott G1) / Xeon MP (Cranford B0) / Celeron D (Prescott G1), 90nm");
-   XFMS (   0,  4, 10,     "Intel Pentium 4 (Prescott R0), 90nm");
+   XFMSC(   0,  4, 10, dP, "Intel Pentium 4 (Prescott R0), 90nm");
+   XFMSC(   0,  4, 10, sX, "Intel Xeon (Nocona R0), 90nm");
+   XFMSC(   0,  4, 10, sI, "Intel Xeon (Irwindale R0), 90nm");
+   XFMS (   0,  4, 10,     "Intel Pentium 4 (Prescott R0) / Xeon (Nocona R0 / Irwindale R0), 90nm");
    XFMC (   0,  4,     dP, "Intel Pentium 4 (Prescott) / Pentium Extreme Edition (Smithfield A0), 90nm");
    XFMC (   0,  4,     dD, "Intel Pentium D (Smithfield A0), 90nm");
    XFMC (   0,  4,     dC, "Intel Celeron D (Prescott), 90nm");
    XFMC (   0,  4,     MP, "Intel Mobile Pentium 4 (Prescott), 90nm");
    XFMC (   0,  4,     sX, "Intel Xeon (Nocona), 90nm");
+   XFMC (   0,  4,     sI, "Intel Xeon (Irwindale), 90nm");
    XFMC (   0,  4,     sM, "Intel Xeon MP (Nocona), 90nm");
-   XFM  (   0,  4,         "Intel Pentium 4 (Prescott) / Xeon (Nocona) / Pentium D (Smithfield A0) / Pentium Extreme Edition (Smithfield A0) / Mobile Pentium 4 (Prescott) / Xeon MP (Nocona) / Xeon MP (Cranford / Potomac) / Celeron D (Prescott) / Dual-Core Xeon (Paxville A0) / Dual-Core Xeon Processor 7000 (Paxville A0), 90nm");
+   XFM  (   0,  4,         "Intel Pentium 4 (Prescott) / Xeon (Nocona / Irwindale) / Pentium D (Smithfield A0) / Pentium Extreme Edition (Smithfield A0) / Mobile Pentium 4 (Prescott) / Xeon MP (Nocona) / Xeon MP (Cranford / Potomac) / Celeron D (Prescott) / Dual-Core Xeon (Paxville A0) / Dual-Core Xeon Processor 7000 (Paxville A0), 90nm");
    /*
    ** How to distinguish?
-   **    Pentium 4 Processor 6x1 (Cedar Mill B1)
-   **    Pentium Processor Extreme Edition 955 (Presler B1)
+   **    Pentium 4 Processor 6x1 (Cedar Mill)
+   **    Pentium Extreme Edition Processor 955 (Presler)
    */
    XFMSC(   0,  6,  2, dD, "Intel Pentium D Processor 9x0 (Presler B1), 65nm");
-   XFMS (   0,  6,  2,     "Intel Pentium 4 Processor 6x1 (Cedar Mill B1) / Pentium Processor Extreme Edition 955 (Presler B1) / Pentium D Processor 900 (Presler B1), 65nm");
-   XFM  (   0,  6,         "Intel Pentium 4 Processor 6x1 (Cedar Mill) / Pentium Processor Extreme Edition 955 (Presler) / Pentium D Processor 900, (Presler), 65nm");
+   XFMSC(   0,  6,  2, dP, "Intel Pentium 4 Processor 6x1 (Cedar Mill B1) / Pentium Extreme Edition Processor 955 (Presler B1)");
+   XFMS (   0,  6,  2,     "Intel Pentium 4 Processor 6x1 (Cedar Mill B1) / Pentium Extreme Edition Processor 955 (Presler B1) / Pentium D Processor 900 (Presler B1), 65nm");
+   XFMSC(   0,  6,  4, dD, "Intel Pentium D Processor 9x0 (Presler C1), 65nm");
+   XFMSC(   0,  6,  4, dP, "Intel Pentium 4 Processor 6x1 (Cedar Mill C1) / Pentium Extreme Edition Processor 955 (Presler C1)");
+   XFMSC(   0,  6,  4, dC, "Intel Celeron D Processor 3xx (Cedar Mill C1), 65nm");
+   XFMSC(   0,  6,  4, sX, "Intel Xeon Processor 5000 (Dempsey C1), 65nm");
+   XFMS (   0,  6,  4,     "Intel Pentium 4 Processor 6x1 (Cedar Mill C1) / Pentium Extreme Edition Processor 955 (Presler C1) / Intel Pentium D Processor 9x0 (Presler C1), 65nm / Intel Xeon Processor 5000 (Dempsey C1) / Celeron D Processor 3xx (Cedar Mill C1), 65nm");
+   XFMC (   0,  6,     dD, "Intel Pentium D Processor 9x0 (Presler), 65nm");
+   XFMC (   0,  6,     dP, "Intel Pentium 4 Processor 6x1 (Cedar Mill) / Pentium Extreme Edition Processor 955 (Presler)");
+   XFMC (   0,  6,     dC, "Intel Celeron D Processor 3xx (Cedar Mill), 65nm");
+   XFMC (   0,  6,     sX, "Intel Xeon Processor 5000 (Dempsey), 65nm");
+   XFM  (   0,  6,         "Intel Pentium 4 Processor 6x1 (Cedar Mill) / Pentium Extreme Edition Processor 955 (Presler) / Pentium D Processor 900 (Presler) / Intel Xeon Processor 5000 (Dempsey) / Celeron D Processor 3xx (Cedar Mill), 65nm");
    XFC  (   0,         dP, "Intel Pentium 4 (unknown model)");
    XFC  (   0,         sX, "Intel Xeon (unknown model)");
    XFC  (   0,         sM, "Intel Xeon MP (unknown model)");
    XFC  (   0,         sP, "Intel Xeon MP (unknown model)");
    XF   (   0,             "Intel Pentium 4 / Xeon / Xeon MP / Mobile Pentium 4 / Celeron / Celeron D / Mobile Celeron / Dual-Core Xeon / Dual-Core Xeon Processor 7000 (unknown model)");
-   XFMS (   1,  5,  4,     "Intel Itanium2 (McKinley B1)");
-   XFMS (   1,  7,  4,     "Intel Itanium2 (McKinley B3)");
-   XFM  (   1,  0,         "Intel Itanium2 (McKinley)");
+   XFMS (   1,  0,  7,     "Intel Itanium2 (McKinley B3), .18um");
+   XFM  (   1,  0,         "Intel Itanium2 (McKinley), .18um");
+   XFMS (   1,  1,  5,     "Intel Itanium2 (Madison/Deerfield B1), .13um");
+   XFM  (   1,  1,         "Intel Itanium2 (Madison/Deerfield), .13um");
+   XFMS (   1,  2,  1,     "Intel Itanium2 (Madison A1), .13um");
+   XFMS (   1,  2,  2,     "Intel Itanium2 (Madison A2), .13um");
+   XFM  (   1,  2,         "Intel Itanium2 (Madison), .13um");
+   XFMS (   2,  0,  5,     "Intel Itanium2 (Montecito C1), 90nm");
+   XFM  (   2,  0,         "Intel Itanium2 (Montecito), 90nm");
    XF   (   1,             "Intel Itanium2 (unknown model)");
    DEFAULT                ("unknown");
    printf("\n");
@@ -1170,8 +1323,8 @@ print_synth_amd(const char*          name,
    FM    (6,     7,         "AMD Duron / Duron MP / mobile Duron (Morgan)");
    FMSC  (6,     8,  0, dX, "AMD Athlon XP (Thoroughbred A0)");
    FMSC  (6,     8,  0, sA, "AMD Athlon MP (Thoroughbred A0)");
-   FMSC  (6,     8,  0, dD, "AMD Duron (Thoroughbred A0)");
-   FMSC  (6,     8,  0, sD, "AMD Duron MP (Thoroughbred A0)");
+   FMSC  (6,     8,  0, dD, "AMD Duron (Applebred A0)");
+   FMSC  (6,     8,  0, sD, "AMD Duron MP (Applebred A0)");
    FMSC  (6,     8,  0, dS, "AMD Sempron (Thoroughbred A0)");
    FMS   (6,     8,  0,     "AMD Athlon XP / Athlon MP / Sempron / Duron / Duron MP (Thoroughbred A0)");
    FMSC  (6,     8,  1, dX, "AMD Athlon XP (Thoroughbred B0)");
@@ -1186,6 +1339,7 @@ print_synth_amd(const char*          name,
    FMC   (6,     8,     sD, "AMD Duron MP (Thoroughbred)");
    FM    (6,     8,         "AMD Athlon XP / Athlon MP / Sempron / Duron / Duron MP (Thoroughbred)");
    FMSC  (6,    10,  0, dX, "AMD Athlon XP (Barton A2)");
+   FMSC  (6,    10,  0, dt, "AMD Athlon XP (Thorton A2)");
    FMSC  (6,    10,  0, sA, "AMD Athlon MP (Barton A2)");
    FMSC  (6,    10,  0, dS, "AMD Sempron (Barton A2)");
    FMSC  (6,    10,  0, MX, "AMD mobile Athlon XP-M (Barton A2)");
@@ -1332,10 +1486,12 @@ print_synth_amd(const char*          name,
    XFXM  (0, 2,  1,         "AMD Dual Core Opteron (Italy/Egypt JH), 940-pin, 90nm");
    XFXMSC(0, 2,  3,  2, DO, "AMD Dual Core Opteron (Denmark JH-E6), 939-pin, 90nm");
    XFXMSC(0, 2,  3,  2, dA, "AMD Athlon 64 X2 (Toledo JH-E6), 939-pin, 90nm");
+   XFXMSC(0, 2,  3,  2, dm, "AMD Athlon 64 X2 (Manchester JH-E6), 939-pin, 90nm");
    XFXMS (0, 2,  3,  2,     "AMD Dual Core Opteron (Denmark JH-E6) / Athlon 64 X2 (Toledo JH-E6), 939-pin, 90nm");
    XFXMC (0, 2,  3,     DO, "AMD Dual Core Opteron (Denmark JH), 939-pin, 90nm");
    XFXMC (0, 2,  3,     dA, "AMD Athlon 64 X2 (Toledo JH), 939-pin, 90nm");
-   XFXM  (0, 2,  3,         "AMD Dual Core Opteron (Denmark JH) / Athlon 64 X2 (Toledo JH), 939-pin, 90nm");
+   XFXMC (0, 2,  3,     dm, "AMD Athlon 64 X2 (Manchester JH), 939-pin, 90nm");
+   XFXM  (0, 2,  3,         "AMD Dual Core Opteron (Denmark JH) / Athlon 64 X2 (Toledo JH / Manchester JH), 939-pin, 90nm");
    XFXMSC(0, 2,  4,  2, MA, "AMD mobile Athlon 64 (Newark SH-E5), 754-pin, 90nm");
    XFXMSC(0, 2,  4,  2, MT, "AMD mobile Turion (Lancaster SH-E5), 754-pin, 90nm");
    XFXMS (0, 2,  4,  2,     "AMD mobile Athlon 64 (Newark SH-E5) / mobile Turion (Lancaster SH-E5), 754-pin, 90nm");
@@ -1355,21 +1511,21 @@ print_synth_amd(const char*          name,
    XFXM  (0, 2,  7,         "AMD Opteron (San Diego SH) / Athlon 64 (San Diego SH) / Athlon 64 FX (San Diego SH), 939-pin, 90nm");
    XFXM  (0, 2, 11,         "AMD Athlon 64 X2 (Manchester BH-E4), 939-pin, 90nm");
    XFXMS (0, 2, 12,  0,     "AMD Sempron (Palermo DH-E3), 754-pin, 90nm");
-   XFXMSC(0, 2, 12,  2, dS, "AMD Sempron (Toledo DH-E6), 754-pin, 90nm");
-   XFXMSC(0, 2, 12,  2, MS, "AMD mobile Sempron (Toledo DH-E6), 754-pin, 90nm");
-   XFXMS (0, 2, 12,  2,     "AMD Sempron (Toledo DH-E6) / mobile Sempron (Toledo DH-E6), 754-pin, 90nm");
-   XFXMC (0, 2, 12,     dS, "AMD Sempron (Toledo DH), 754-pin, 90nm");
-   XFXMC (0, 2, 12,     MS, "AMD mobile Sempron (Toledo DH), 754-pin, 90nm");
-   XFXM  (0, 2, 12,         "AMD Sempron (Toledo DH) / mobile Sempron (Toledo DH), 754-pin, 90nm");
+   XFXMSC(0, 2, 12,  2, dS, "AMD Sempron (Palermo DH-E6), 754-pin, 90nm");
+   XFXMSC(0, 2, 12,  2, MS, "AMD mobile Sempron (Palermo DH-E6), 754-pin, 90nm");
+   XFXMS (0, 2, 12,  2,     "AMD Sempron (Palermo DH-E6) / mobile Sempron (Palermo DH-E6), 754-pin, 90nm");
+   XFXMC (0, 2, 12,     dS, "AMD Sempron (Palermo DH), 754-pin, 90nm");
+   XFXMC (0, 2, 12,     MS, "AMD mobile Sempron (Palermo DH), 754-pin, 90nm");
+   XFXM  (0, 2, 12,         "AMD Sempron (Palermo DH) / mobile Sempron (Palermo DH), 754-pin, 90nm");
    XFXMSC(0, 2, 15,  0, dA, "AMD Athlon 64 (Venice DH-E3), 939-pin, 90nm");
    XFXMSC(0, 2, 15,  0, dS, "AMD Sempron (Palermo DH-E3), 939-pin, 90nm");
    XFXMS (0, 2, 15,  0,     "AMD Athlon 64 (Venice DH-E3) / Sempron (Palermo DH-E3), 939-pin, 90nm");
-   XFXMSC(0, 2, 15,  2, dA, "AMD Athlon 64 (Toledo DH-E6), 939-pin, 90nm");
-   XFXMSC(0, 2, 15,  2, dS, "AMD Sempron (Toledo DH-E6), 939-pin, 90nm");
-   XFXMS (0, 2, 15,  2,     "AMD Athlon 64 (Toledo DH-E6) / Sempron (Toledo DH-E6), 939-pin, 90nm");
-   XFXMC (0, 2, 15,     dA, "AMD Athlon 64 (Toledo DH), 939-pin, 90nm");
-   XFXMC (0, 2, 15,     dS, "AMD Sempron (Toledo DH), 939-pin, 90nm");
-   XFXM  (0, 2, 15,         "AMD Athlon 64 (Toledo DH) / Sempron (Toledo DH), 939-pin, 90nm");
+   XFXMSC(0, 2, 15,  2, dA, "AMD Athlon 64 (Venice DH-E6), 939-pin, 90nm");
+   XFXMSC(0, 2, 15,  2, dS, "AMD Sempron (Palermo DH-E6), 939-pin, 90nm");
+   XFXMS (0, 2, 15,  2,     "AMD Athlon 64 (Venice DH-E6) / Sempron (Palermo DH-E6), 939-pin, 90nm");
+   XFXMC (0, 2, 15,     dA, "AMD Athlon 64 (Venice DH), 939-pin, 90nm");
+   XFXMC (0, 2, 15,     dS, "AMD Sempron (Palermo DH), 939-pin, 90nm");
+   XFXM  (0, 2, 15,         "AMD Athlon 64 (Venice DH) / Sempron (Palermo DH), 939-pin, 90nm");
    XF    (0,                "AMD Opteron / Athlon 64 / Athlon 64 FX / Sempron / Dual Core Opteron / Athlon 64 X2 / mobile Athlon 64 / mobile Sempron / mobile Athlon XP-M (DP) (unknown model)");
    DEFAULT                ("unknown");
 
@@ -1585,8 +1741,8 @@ print_x_synth_amd(unsigned int  val)
    XFXMS(0, 2,  1,  0, "AMD Dual Core Opteron (Italy/Egypt JH-E1), 940-pin, 90nm");
    XFXMS(0, 2,  1,  2, "AMD Dual Core Opteron (Italy/Egypt JH-E6), 940-pin, 90nm");
    XFXM (0, 2,  1,     "AMD Dual Core Opteron (Italy/Egypt JH), 940-pin, 90nm");
-   XFXMS(0, 2,  3,  2, "AMD Dual Core Opteron (Denmark JH-E6) / Athlon 64 X2 (Toledo JH-E6), 939-pin, 90nm");
-   XFXM (0, 2,  3,     "AMD Dual Core Opteron (Denmark JH) / Athlon 64 X2 (Toledo JH), 939-pin, 90nm");
+   XFXMS(0, 2,  3,  2, "AMD Dual Core Opteron (Denmark JH-E6) / Athlon 64 X2 (Toledo JH-E6 / Manchester JH-E6), 939-pin, 90nm");
+   XFXM (0, 2,  3,     "AMD Dual Core Opteron (Denmark JH) / Athlon 64 X2 (Toledo JH / Manchester JH), 939-pin, 90nm");
    XFXMS(0, 2,  4,  2, "AMD mobile Athlon 64 (Newark SH-E5) / mobile Turion (Lancaster SH-E5), 754-pin, 90nm");
    XFXM (0, 2,  4,     "AMD mobile Athlon 64 (Newark SH) / mobile Turion (Lancaster SH), 754-pin, 90nm");
    XFXM (0, 2,  5,     "AMD Opteron (Troy/Athens SH-E4), 940-pin, 90nm");
@@ -1594,11 +1750,11 @@ print_x_synth_amd(unsigned int  val)
    XFXM (0, 2,  7,     "AMD Opteron (San Diego SH) / Athlon 64 (San Diego SH) / Athlon 64 FX (San Diego SH), 939-pin, 90nm");
    XFXM (0, 2, 11,     "AMD Athlon 64 X2 (Manchester BH-E4), 939-pin, 90nm");
    XFXMS(0, 2, 12,  0, "AMD Sempron (Palermo DH-E3), 754-pin, 90nm");
-   XFXMS(0, 2, 12,  2, "AMD Sempron (Toledo DH-E6) / mobile Sempron (Toledo DH-E6), 754-pin, 90nm");
-   XFXM (0, 2, 12,     "AMD Sempron (Toledo DH) / mobile Sempron (Toledo DH), 754-pin, 90nm");
+   XFXMS(0, 2, 12,  2, "AMD Sempron (Venice DH-E6) / mobile Sempron (Palermo DH-E6), 754-pin, 90nm");
+   XFXM (0, 2, 12,     "AMD Sempron (Venice DH) / mobile Sempron (Palermo DH), 754-pin, 90nm");
    XFXMS(0, 2, 15,  0, "AMD Athlon 64 (Venice DH-E3) / Sempron (Palermo DH-E3), 939-pin, 90nm");
-   XFXMS(0, 2, 15,  2, "AMD Athlon 64 (Toledo DH-E6) / Sempron (Toledo DH-E6), 939-pin, 90nm");
-   XFXM (0, 2, 15,     "AMD Athlon 64 (Toledo DH) / Sempron (Toledo DH), 939-pin, 90nm");
+   XFXMS(0, 2, 15,  2, "AMD Athlon 64 (Toledo DH-E6) / Sempron (Palermo DH-E6), 939-pin, 90nm");
+   XFXM (0, 2, 15,     "AMD Athlon 64 (Toledo DH) / Sempron (Palermo DH), 939-pin, 90nm");
    XF   (0,            "AMD Opteron / Athlon 64 / Sempron / Turion / Athlon 64 FX / Athlon XP-M / mobile Athlon 64 / mobile Sempron / mobile Athlon XP-M (unknown)");
    DEFAULT           ("unknown");
    printf("\n");
@@ -1709,12 +1865,7 @@ print_synth(const code_stash_t*  stash)
 #define GET_NC_AMD(val_80000008_ecx) \
    (BIT_EXTRACT_LE((val_80000008_ecx), 0, 8))
 
-static void print_mp_synth(vendor_t      vendor,
-                           unsigned int  val_1_ebx,
-                           unsigned int  val_1_edx,
-                           unsigned int  val_4_eax,
-                           unsigned int  val_80000001_ecx,
-                           unsigned int  val_80000008_ecx)
+static void decode_mp_synth(code_stash_t*  stash)
 {
    /*
    ** This logic based on the AMD CPUID Specification (25481).
@@ -1722,35 +1873,60 @@ static void print_mp_synth(vendor_t      vendor,
    **       on a single-core machine.  But Intel doesn't follow that
    **       convention and uses 1 for a single-core machine.  So, cope.
    */
-   printf("   (multi-processing synth): ");
-   if (IS_HTT(val_1_edx)) {
-      boolean       ok = TRUE;
-      unsigned int  tc = GET_LogicalProcessorCount(val_1_ebx);
+   if (IS_HTT(stash->val_1_edx)) {
+      unsigned int  tc = GET_LogicalProcessorCount(stash->val_1_ebx);
       unsigned int  c;
-      switch (vendor) {
+      switch (stash->vendor) {
       case VENDOR_INTEL:
-         c = GET_NC_INTEL(val_4_eax) + 1;
+         c = GET_NC_INTEL(stash->val_4_eax) + 1;
+         stash->mp.ok = TRUE;
          break;
       case VENDOR_AMD:
-         c  = GET_NC_AMD(val_80000008_ecx) + 1;
-         ok = (tc == c) == IS_CmpLegacy(val_80000001_ecx);
+         c  = GET_NC_AMD(stash->val_80000008_ecx) + 1;
+         stash->mp.ok = (tc == c) == IS_CmpLegacy(stash->val_80000001_ecx);
          break;
       default:
          c  = 0;
-         ok = FALSE;
+         stash->mp.ok = FALSE;
          break;
       }
-      if (!ok) {
-         printf("?");
+      if (!stash->mp.ok) {
+         stash->mp.cores        = -1;
+         stash->mp.hyperthreads = -1;
+         // DO NOTHING
       } else if (c > 1) {
          if (tc == c) {
-            printf("multi-core (c=%u)", c);
+            stash->mp.cores        = c;
+            stash->mp.hyperthreads = 1;
          } else {
-            printf("multi-core (c=%u), hyper-threaded (t=%u)", c, tc / c);
+            stash->mp.cores        = c;
+            stash->mp.hyperthreads = tc / c;
          }
       } else {
-         printf("hyper-threaded (t=%u)", (tc >= 2 ? tc : 2));
+         stash->mp.cores        = 1;
+         stash->mp.hyperthreads = (tc >= 2 ? tc : 2);
       }
+   } else {
+      stash->mp.ok           = TRUE;
+      stash->mp.cores        = 1;
+      stash->mp.hyperthreads = 1;
+   }
+}
+
+static void print_mp_synth(const struct mp*  mp)
+{
+   printf("   (multi-processing synth): ");
+   if (!mp->ok) {
+      printf("?");
+   } else if (mp->cores > 1) {
+      if (mp->hyperthreads > 1) {
+         printf("multi-core (c=%u), hyper-threaded (t=%u)", 
+                mp->cores, mp->hyperthreads);
+      } else {
+         printf("multi-core (c=%u)", mp->cores);
+      }
+   } else if (mp->hyperthreads > 1) {
+      printf("hyper-threaded (t=%u)", mp->hyperthreads);
    } else {
       printf("none");
    }
@@ -2080,7 +2256,7 @@ print_4_eax(unsigned int  value)
         };
 
    print_names(value, names, LENGTH(names, named_item),
-               /* max_len => */ 0);
+               /* max_len => */ 33);
 }
 
 static void
@@ -2093,7 +2269,7 @@ print_4_ebx(unsigned int  value)
         };
 
    print_names(value, names, LENGTH(names, named_item),
-               /* max_len => */ 0);
+               /* max_len => */ 33);
 }
 
 static void
@@ -2826,7 +3002,7 @@ print_80860002_eax(unsigned int   value,
                    code_stash_t*  stash)
 {
    if (stash->transmeta_proc_rev == 0x02000000) {
-      printf("   Transmeta processor revision (0x80000002/eax)"
+      printf("   Transmeta processor revision (0x80860002/eax)"
              " = %u.%u-%u.%u ", 
              (value >> 24) & 0xff,
              (value >> 16) & 0xff,
@@ -2904,6 +3080,8 @@ static int read_reg (int           cpuid_fd,
 #define WORD_ECX  2
 #define WORD_EDX  3
 
+#define WORD_NUM  4
+
 #define FOUR_CHARS_VALUE(s) \
    ((unsigned int)((s)[0] + ((s)[1] << 8) + ((s)[2] << 16) + ((s)[3] << 24)))
 #define IS_VENDOR_ID(words, s)                        \
@@ -2922,10 +3100,14 @@ usage(void)
    printf("\n");
    printf("options:\n");
    printf("\n");
-   printf("   -h, -H, --help     display this help information\n");
-   printf("   -1,     --one-cpu  display information only for the first CPU\n");
-   printf("   -r,     --raw      display raw hex information with no"
-                                 " decoding\n");
+   printf("   -h, -H,  --help       display this help information\n");
+   printf("   -1,      --one-cpu    display information only for the first"
+                                    " CPU\n");
+   printf("   -f FILE, --file=FILE  read raw hex information from FILE instead"
+                                    " of from\n");
+   printf("                         executions of the cpuid instruction\n");
+   printf("   -r,      --raw        display raw hex information with no"
+                                    " decoding\n");
    printf("\n");
    exit(1);
 }
@@ -3017,17 +3199,20 @@ open_file(unsigned int cpu)
       ** smartypants gcc/glibc during the link if I attempt to use tempnam.
       */
       char  tmpname[20];
+      int   dummy_fd;
       strcpy(tmpname, "/tmp/cpuidXXXXXX");
-      int  dummy_fd = mkstemp(tmpname);
+      dummy_fd = mkstemp(tmpname);
       if (dummy_fd != -1) {
          close(dummy_fd);
          remove(tmpname);
-         int  status = mknod(tmpname,
-                             (S_IFCHR | S_IRUSR),
-                             makedev(CPUID_MAJOR, cpu));
-         if (status == 0) {
-            cpuid_fd = open(tmpname, O_RDONLY);
-            remove(tmpname);
+         {
+            int  status = mknod(tmpname,
+                                (S_IFCHR | S_IRUSR),
+                                makedev(CPUID_MAJOR, cpu));
+            if (status == 0) {
+               cpuid_fd = open(tmpname, O_RDONLY);
+               remove(tmpname);
+            }
          }
       }
       if (cpuid_fd == -1) {
@@ -3045,21 +3230,390 @@ open_file(unsigned int cpu)
    return cpuid_fd;
 }
 
+static void
+print_reg_raw (unsigned int        reg,
+               const unsigned int  words[WORD_NUM])
+{
+   printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
+          (unsigned int)reg,
+          words[WORD_EAX], words[WORD_EBX],
+          words[WORD_ECX], words[WORD_EDX]);
+}
+
+static void 
+print_reg (unsigned int        reg,
+           const unsigned int  words[WORD_NUM],
+           boolean             raw,
+           unsigned int        try,
+           code_stash_t*       stash)
+{
+   if (raw) {
+      print_reg_raw(reg, words);
+   } else if (reg == 0) {
+      // basic_max already set to words[WORD_EAX]
+      printf("   vendor_id = \"%4.4s%4.4s%4.4s\"\n",
+             (const char*)&words[WORD_EBX], 
+             (const char*)&words[WORD_EDX], 
+             (const char*)&words[WORD_ECX]);
+      if (IS_VENDOR_ID(words, "GenuineIntel")) {
+         stash->vendor = VENDOR_INTEL;
+      } else if (IS_VENDOR_ID(words, "AuthenticAMD")) {
+         stash->vendor = VENDOR_AMD;
+      } else if (IS_VENDOR_ID(words, "CyrixInstead")) {
+         stash->vendor = VENDOR_CYRIX;
+      } else if (IS_VENDOR_ID(words, "CentaurHauls")) {
+         stash->vendor = VENDOR_VIA;
+      } else if (IS_VENDOR_ID(words, "UMC UMC UMC ")) {
+         stash->vendor = VENDOR_UMC;
+      } else if (IS_VENDOR_ID(words, "NexGenDriven")) {
+         stash->vendor = VENDOR_NEXGEN;
+      } else if (IS_VENDOR_ID(words, "RiseRiseRise")) {
+         stash->vendor = VENDOR_RISE;
+      } else if (IS_VENDOR_ID(words, "GenuineTMx86")) {
+         stash->vendor = VENDOR_TRANSMETA;
+      }
+   } else if (reg == 1) {
+      print_1_eax(words[WORD_EAX], stash->vendor);
+      print_1_ebx(words[WORD_EBX]);
+      print_brand(words[WORD_EAX], words[WORD_EBX]);
+      print_1_edx(words[WORD_EDX]);
+      print_1_ecx(words[WORD_ECX]);
+      stash->val_1_eax = words[WORD_EAX];
+      stash->val_1_ebx = words[WORD_EBX];
+      stash->val_1_ecx = words[WORD_ECX];
+      stash->val_1_edx = words[WORD_EDX];
+   } else if (reg == 2) {
+      unsigned int  word = 0;
+      for (; word < 4; word++) {
+         if ((words[word] & 0x80000000) == 0) {
+            const unsigned char*  bytes = (const unsigned char*)&words[word];
+            unsigned int          byte  = (try == 0 && word == WORD_EAX ? 1
+                                                                        : 0);
+            for (; byte < 4; byte++) {
+               print_2_byte(bytes[byte], stash->vendor, stash->val_1_eax);
+               stash_intel_cache(stash, bytes[byte]);
+            }
+         }
+      }
+   } else if (reg == 3) {
+      printf("   processor serial number:"
+             " %04X-%04X-%04X-%04X-%04X-%04X\n",
+             stash->val_1_eax >> 16, stash->val_1_eax & 0xffff, 
+             words[WORD_EDX] >> 16, words[WORD_EDX] & 0xffff, 
+             words[WORD_ECX] >> 16, words[WORD_ECX] & 0xffff);
+   } else if (reg == 4) {
+      printf("   deterministic cache parameters (4):\n");
+      print_4_eax(words[WORD_EAX]);
+      print_4_ebx(words[WORD_EAX]);
+      printf("      number of sets (s)                = %u\n", words[WORD_ECX]);
+      stash->val_4_eax = words[WORD_EAX];
+   } else if (reg == 5) {
+      printf("   MONITOR/MWAIT (5):\n");
+      print_5_eax(words[WORD_EAX]);
+      print_5_ebx(words[WORD_EAX]);
+   } else if (reg == 6) {
+      printf("   Power Management Features (6):\n");
+      print_6_eax(words[WORD_EAX]);
+      print_6_ebx(words[WORD_EAX]);
+   } else if (reg == 0x80000000) {
+      // basic_max already set to words[WORD_EAX]
+   } else if (reg == 0x80000001) {
+      print_80000001_eax(words[WORD_EAX], stash->vendor);
+      print_80000001_edx(words[WORD_EDX], stash->vendor);
+      print_80000001_ebx(words[WORD_EBX], stash->vendor);
+      print_80000001_ecx(words[WORD_ECX], stash->vendor);
+      stash->val_80000001_ebx = words[WORD_EBX];
+      stash->val_80000001_ecx = words[WORD_ECX];
+   } else if (reg == 0x80000002) {
+      memcpy(&stash->brand[0], words, sizeof(unsigned int)*WORD_NUM);
+   } else if (reg == 0x80000003) {
+      memcpy(&stash->brand[16], words, sizeof(unsigned int)*WORD_NUM);
+   } else if (reg == 0x80000004) {
+      memcpy(&stash->brand[32], words, sizeof(unsigned int)*WORD_NUM);
+      printf("   brand = \"%s\"\n", stash->brand);
+   } else if (reg == 0x80000005) {
+      print_80000005_eax(words[WORD_EAX]);
+      print_80000005_ebx(words[WORD_EBX]);
+      print_80000005_ecx(words[WORD_ECX]);
+      print_80000005_edx(words[WORD_EDX]);
+   } else if (reg == 0x80000006) {
+      print_80000006_eax(words[WORD_EAX]);
+      print_80000006_ebx(words[WORD_EBX]);
+      print_80000006_ecx(words[WORD_ECX], stash);
+   } else if (reg == 0x80000007) {
+      print_80000007_edx(words[WORD_EDX]);
+   } else if (reg == 0x80000008) {
+      print_80000008_eax(words[WORD_EAX]);
+      print_80000008_ecx(words[WORD_ECX]);
+      stash->val_80000008_ecx = words[WORD_ECX];
+   } else if (reg == 0x80000009) {
+      /* reserved for Intel feature flag expansion */
+   } else if (reg == 0x8000000a) {
+      print_8000000a_eax(words[WORD_EAX]);
+      print_8000000a_edx(words[WORD_EAX]);
+      print_8000000a_ebx(words[WORD_EBX]);
+   } else if (0x8000000b <= reg && reg <= 0x80000018) {
+      /* reserved for vendors to be determined feature flag expansion */
+   } else if (reg == 0x80860000) {
+      // basic_max already set to words[WORD_EAX]
+   } else if (reg == 0x80860001) {
+      print_80860001_eax(words[WORD_EAX]);
+      print_80860001_edx(words[WORD_EDX]);
+      print_80860001_ebx_ecx(words[WORD_EBX], words[WORD_ECX]);
+   } else if (reg == 0x80860002) {
+      print_80860002_eax(words[WORD_EAX], stash);
+      printf("   Transmeta CMS revision (0x80000002/ecx)"
+             " = %u.%u-%u.%u-%u ", 
+             (words[WORD_EBX] >> 24) & 0xff,
+             (words[WORD_EBX] >> 16) & 0xff,
+             (words[WORD_EBX] >>  8) & 0xff,
+             (words[WORD_EBX] >>  0) & 0xff,
+             words[WORD_ECX]);
+   } else if (reg == 0x80860003) {
+      memcpy(&stash->transmeta_info[0], words, sizeof(unsigned int)*WORD_NUM);
+   } else if (reg == 0x80860004) {
+      memcpy(&stash->transmeta_info[16], words, sizeof(unsigned int)*WORD_NUM);
+   } else if (reg == 0x80860005) {
+      memcpy(&stash->transmeta_info[32], words, sizeof(unsigned int)*WORD_NUM);
+   } else if (reg == 0x80860006) {
+      memcpy(&stash->transmeta_info[48], words, sizeof(unsigned int)*WORD_NUM);
+      printf("   Transmeta information = \"%s\"\n", stash->transmeta_info);
+   } else if (reg == 0x80860007) {
+      printf("   Transmeta core clock frequency = %u MHz\n",
+             words[WORD_EAX]);
+      printf("   Transmeta processor voltage    = %u mV\n",
+             words[WORD_EBX]);
+      printf("   Transmeta performance          = %u%%\n",
+             words[WORD_ECX]);
+      printf("   Transmeta gate delay           = %u fs\n",
+             words[WORD_EDX]);
+   } else if (reg == 0xc0000000) {
+      // basic_max already set to words[WORD_EAX]
+   } else if (reg == 0xc0000001) {
+      if (stash->vendor == VENDOR_VIA) {
+         printf("   0x%08x: eax=0x%08x\n", 
+                (unsigned int)reg, words[WORD_EAX]);
+         print_c0000001_edx(words[WORD_EDX]);
+      } else {
+         /* DO NOTHING */
+      }
+   } else {
+      print_reg_raw(reg, words);
+   }
+}
+
+static void
+do_real(boolean  one_cpu,
+        boolean  raw)
+{
+   unsigned int  cpu;
+
+   for (cpu = 0;; cpu++) {
+      int            cpuid_fd   = -1;
+      code_stash_t   stash      = NIL_STASH;
+      unsigned int   basic_max;
+      unsigned int   reg;
+
+      if (one_cpu && cpu > 0) break;
+
+      cpuid_fd = open_file(cpu);
+      if (cpuid_fd == -1) break;
+
+      printf("CPU %u:\n", cpu);
+
+      basic_max = 0;
+      for (reg = 0; reg <= basic_max; reg++) {
+         unsigned int  words[WORD_NUM];
+
+         read_reg(cpuid_fd, reg, words, FALSE);
+
+         if (reg == 0) {
+            basic_max = words[WORD_EAX];
+         }
+
+         if (reg == 2) {
+            unsigned int  max_tries = words[WORD_EAX] & 0xff;
+            unsigned int  try       = 0;
+
+            if (!raw) {
+               printf("   cache and TLB information (2):\n");
+            }
+
+            for (;;) {
+               print_reg(reg, words, raw, try, &stash);
+
+               try++;
+               if (try >= max_tries) break;
+
+               read_reg(cpuid_fd, reg, words, FALSE);
+            } while (try < max_tries);
+         } else {
+            print_reg(reg, words, raw, 0, &stash);
+         }
+      }
+
+      basic_max = 0x80000000;
+      for (reg = 0x80000000; reg <= basic_max; reg++) {
+         boolean       success;
+         unsigned int  words[WORD_NUM];
+
+         success = read_reg(cpuid_fd, reg, words, TRUE);
+         if (!success) break;
+
+         if (reg == 0x80000000) {
+            basic_max = words[WORD_EAX];
+         }
+
+         print_reg(reg, words, raw, 0, &stash);
+      }
+
+      basic_max = 0x80860000;
+      for (reg = 0x80860000; reg <= basic_max; reg++) {
+         boolean       success;
+         unsigned int  words[WORD_NUM];
+
+         success = read_reg(cpuid_fd, reg, words, TRUE);
+         if (!success) break;
+
+         if (reg == 0x80860000) {
+            basic_max = words[WORD_EAX];
+         }
+
+         print_reg(reg, words, raw, 0, &stash);
+      }
+
+      basic_max = 0xc0000000;
+      for (reg = 0xc0000000; reg <= basic_max; reg++) {
+         boolean       success;
+         unsigned int  words[WORD_NUM];
+
+         success = read_reg(cpuid_fd, reg, words, TRUE);
+         if (!success) break;
+
+         if (reg == 0xc0000000) {
+            basic_max = words[WORD_EAX];
+         }
+
+         print_reg(reg, words, raw, 0, &stash);
+      }
+      
+      if (!raw) {
+         decode_mp_synth(&stash);
+         print_mp_synth(&stash.mp);
+         print_synth(&stash);
+      }
+
+      close(cpuid_fd);
+   }
+}
+
+static void
+do_file(ccstring  filename,
+        boolean   one_cpu,
+        boolean   raw)
+{
+   boolean       seen_cpu = FALSE;
+   unsigned int  cpu      = -1;
+   unsigned int  try2     = -1;
+   code_stash_t  stash;
+
+   FILE*  file = fopen(filename, "r");
+   if (file == NULL) {
+      fprintf(stderr,
+              "%s: unable to open %s; errno = %d (%s)\n",
+              program, filename, errno, strerror(errno));
+      exit(1);
+   }
+
+   while (!feof(file)) {
+      char          buffer[80];
+      char*         ptr;
+      unsigned int  len;
+      int           status;
+      unsigned int  reg;
+      unsigned int  words[WORD_NUM];
+
+      ptr = fgets(buffer, LENGTH(buffer, char), file);
+      if (ptr == NULL && errno == 0) break;
+      if (ptr == NULL) {
+         fprintf(stderr,
+                 "%s: unable to read a line of text from %s;"
+                 " errno = %d (%s)\n",
+                 program, filename, errno, strerror(errno));
+         exit(1);
+      }
+
+      len = strlen(buffer);
+
+      status = sscanf(ptr, "CPU %u:\r", &cpu);
+      if (status == 1) {
+         if (!raw && seen_cpu) {
+            decode_mp_synth(&stash);
+            print_mp_synth(&stash.mp);
+            print_synth(&stash);
+         }
+
+         seen_cpu = TRUE;
+
+         printf("CPU %u:\n", cpu);
+         try2 = 0;
+         {
+            static code_stash_t  empty_stash = NIL_STASH;
+            stash = empty_stash;
+         }
+         continue;
+      }
+
+      status = sscanf(ptr,
+                      "   0x%x: eax=0x%x ebx=0x%x ecx=0x%x edx=0x%x\r",
+                      &reg, 
+                      &words[WORD_EAX], &words[WORD_EBX],
+                      &words[WORD_ECX], &words[WORD_EDX]);
+      if (status == 5) {
+         if (reg == 2) {
+            if (try2 == 0) {
+               if (!raw) {
+                  printf("   cache and TLB information (2):\n");
+               }
+            }
+            print_reg(reg, words, raw, try2++, &stash);
+         } else {
+            print_reg(reg, words, raw, 0, &stash);
+         }
+         continue;
+      }
+
+      fprintf(stderr,
+              "%s: unexpected input with -f option: %s\n",
+              program, ptr);
+      exit(1);
+   }
+
+   if (!raw && seen_cpu) {
+      decode_mp_synth(&stash);
+      print_mp_synth(&stash.mp);
+      print_synth(&stash);
+   }
+
+   fclose(file);
+}
+
 int
 main(int     argc,
      string  argv[])
 {
-   static ccstring             shortopts  = "+hH1r";
+   static ccstring             shortopts  = "+hH1rf:";
    static const struct option  longopts[] = {
-      { "help",    no_argument, NULL, 'h'  },
-      { "one-cpu", no_argument, NULL, '1'  },
-      { "raw",     no_argument, NULL, 'r'  },
-      { NULL,      no_argument, NULL, '\0' }
+      { "help",    no_argument,       NULL, 'h'  },
+      { "one-cpu", no_argument,       NULL, '1'  },
+      { "raw",     no_argument,       NULL, 'r'  },
+      { "file",    required_argument, NULL, 'f'  },
+      { NULL,      no_argument,       NULL, '\0' }
    };
 
-   boolean       opt_one_cpu = FALSE;
-   boolean       opt_raw     = FALSE;
-   unsigned int  cpu;
+   boolean  opt_one_cpu  = FALSE;
+   boolean  opt_raw      = FALSE;
+   cstring  opt_filename = NULL;
 
    program = strrchr(argv[0], '/');
    if (program == NULL) {
@@ -3087,11 +3641,14 @@ main(int     argc,
       case 'r':
          opt_raw = TRUE;
          break;
+      case 'f':
+         opt_filename = optarg;
+         break;
       case '?':
       default:
          if (optopt == '\0') {
             fprintf(stderr,
-                    "%s: unrecoginzed option: %s\n", program, argv[optind-1]);
+                    "%s: unrecogized option: %s\n", program, argv[optind-1]);
          } else {
             fprintf(stderr, 
                     "%s: unrecognized option letter: %c\n", program, optopt);
@@ -3107,286 +3664,10 @@ main(int     argc,
       /*NOTREACHED*/
    }
 
-   for (cpu = 0;; cpu++) {
-      int            cpuid_fd   = -1;
-      code_stash_t   stash      = NIL_STASH;
-      unsigned int   basic_max;
-      unsigned int   reg;
-
-      if (opt_one_cpu && cpu > 0) break;
-
-      cpuid_fd = open_file(cpu);
-      if (cpuid_fd == -1) break;
-
-      printf("CPU %u:\n", cpu);
-
-      basic_max = 0;
-      for (reg = 0; reg <= basic_max; reg++) {
-         unsigned int  words[4];
-
-         read_reg(cpuid_fd, reg, words, FALSE);
-
-         if (opt_raw) {
-            if (reg == 0) {
-               basic_max = words[WORD_EAX];
-            }
-            printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
-                   reg,
-                   words[WORD_EAX], words[WORD_EBX],
-                   words[WORD_ECX], words[WORD_EDX]);
-         } else if (reg == 0) {
-            basic_max = words[WORD_EAX];
-            printf("   vendor_id = \"%4.4s%4.4s%4.4s\"\n",
-                   (const char*)&words[WORD_EBX], 
-                   (const char*)&words[WORD_EDX], 
-                   (const char*)&words[WORD_ECX]);
-            if (IS_VENDOR_ID(words, "GenuineIntel")) {
-               stash.vendor = VENDOR_INTEL;
-            } else if (IS_VENDOR_ID(words, "AuthenticAMD")) {
-               stash.vendor = VENDOR_AMD;
-            } else if (IS_VENDOR_ID(words, "CyrixInstead")) {
-               stash.vendor = VENDOR_CYRIX;
-            } else if (IS_VENDOR_ID(words, "CentaurHauls")) {
-               stash.vendor = VENDOR_VIA;
-            } else if (IS_VENDOR_ID(words, "UMC UMC UMC ")) {
-               stash.vendor = VENDOR_UMC;
-            } else if (IS_VENDOR_ID(words, "NexGenDriven")) {
-               stash.vendor = VENDOR_NEXGEN;
-            } else if (IS_VENDOR_ID(words, "RiseRiseRise")) {
-               stash.vendor = VENDOR_RISE;
-            } else if (IS_VENDOR_ID(words, "GenuineTMx86")) {
-               stash.vendor = VENDOR_TRANSMETA;
-            }
-         } else if (reg == 1) {
-            print_1_eax(words[WORD_EAX], stash.vendor);
-            print_1_ebx(words[WORD_EBX]);
-            print_brand(words[WORD_EAX], words[WORD_EBX]);
-            print_1_edx(words[WORD_EDX]);
-            print_1_ecx(words[WORD_ECX]);
-            stash.val_1_eax = words[WORD_EAX];
-            stash.val_1_ebx = words[WORD_EBX];
-            stash.val_1_ecx = words[WORD_ECX];
-            stash.val_1_edx = words[WORD_EDX];
-         } else if (reg == 2) {
-            unsigned int  max_tries = words[WORD_EAX] & 0xff;
-            unsigned int  try       = 0;
-
-            printf("   cache and TLB information (2):\n");
-
-            for (;;) {
-               unsigned int  word = 0;
-               for (; word < 4; word++) {
-                  if ((words[word] & 0x80000000) == 0) {
-                     unsigned int  byte = (try == 0 && word == WORD_EAX ? 1
-                                                                        : 0);
-                     for (; byte < 4; byte++) {
-                        unsigned char*  bytes = (unsigned char*)(&words[word]);
-
-                        print_2_byte(bytes[byte], 
-                                     stash.vendor, stash.val_1_eax);
-                        stash_intel_cache(&stash, bytes[byte]);
-                     }
-                  }
-               }
-
-               try++;
-               if (try >= max_tries) break;
-
-               read_reg(cpuid_fd, reg, words, FALSE);
-            } while (try < max_tries);
-         } else if (reg == 3) {
-            printf("   processor serial number:"
-                   " %04X-%04X-%04X-%04X-%04X-%04X\n",
-                   stash.val_1_eax >> 16, stash.val_1_eax & 0xffff, 
-                   words[WORD_EDX] >> 16, words[WORD_EDX] & 0xffff, 
-                   words[WORD_ECX] >> 16, words[WORD_ECX] & 0xffff);
-         } else if (reg == 4) {
-            printf("   deterministic cache parameters (4):\n");
-            print_4_eax(words[WORD_EAX]);
-            print_4_ebx(words[WORD_EAX]);
-            printf("      number of sets (s) = %u\n", words[WORD_ECX]);
-            stash.val_4_eax = words[WORD_EAX];
-         } else if (reg == 5) {
-            printf("   MONITOR/MWAIT (5):\n");
-            print_5_eax(words[WORD_EAX]);
-            print_5_ebx(words[WORD_EAX]);
-         } else if (reg == 6) {
-            printf("   Power Management Features (6):\n");
-            print_6_eax(words[WORD_EAX]);
-            print_6_ebx(words[WORD_EAX]);
-         } else {
-            printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
-                   reg,
-                   words[WORD_EAX], words[WORD_EBX],
-                   words[WORD_ECX], words[WORD_EDX]);
-         }
-      }
-
-      basic_max = 0x80000000;
-      for (reg = 0x80000000; reg <= basic_max; reg++) {
-         boolean       success;
-         unsigned int  words[4];
-
-         success = read_reg(cpuid_fd, reg, words, TRUE);
-         if (!success) break;
-
-         if (opt_raw) {
-            if (reg == 0x80000000) {
-               basic_max = words[WORD_EAX];
-            }
-            printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
-                   reg,
-                   words[WORD_EAX], words[WORD_EBX],
-                   words[WORD_ECX], words[WORD_EDX]);
-         } else if (reg == 0x80000000) {
-            basic_max = words[WORD_EAX];
-         } else if (reg == 0x80000001) {
-            print_80000001_eax(words[WORD_EAX], stash.vendor);
-            print_80000001_edx(words[WORD_EDX], stash.vendor);
-            print_80000001_ebx(words[WORD_EBX], stash.vendor);
-            print_80000001_ecx(words[WORD_ECX], stash.vendor);
-            stash.val_80000001_ebx = words[WORD_EBX];
-            stash.val_80000001_ecx = words[WORD_ECX];
-         } else if (reg == 0x80000002) {
-            memcpy(&stash.brand[0], words, sizeof(words));
-         } else if (reg == 0x80000003) {
-            memcpy(&stash.brand[16], words, sizeof(words));
-         } else if (reg == 0x80000004) {
-            memcpy(&stash.brand[32], words, sizeof(words));
-            printf("   brand = \"%s\"\n", stash.brand);
-         } else if (reg == 0x80000005) {
-            print_80000005_eax(words[WORD_EAX]);
-            print_80000005_ebx(words[WORD_EBX]);
-            print_80000005_ecx(words[WORD_ECX]);
-            print_80000005_edx(words[WORD_EDX]);
-         } else if (reg == 0x80000006) {
-            print_80000006_eax(words[WORD_EAX]);
-            print_80000006_ebx(words[WORD_EBX]);
-            print_80000006_ecx(words[WORD_ECX], &stash);
-         } else if (reg == 0x80000007) {
-            print_80000007_edx(words[WORD_EDX]);
-         } else if (reg == 0x80000008) {
-            print_80000008_eax(words[WORD_EAX]);
-            print_80000008_ecx(words[WORD_ECX]);
-            stash.val_80000008_ecx = words[WORD_ECX];
-         } else if (reg == 0x80000009) {
-            /* reserved for Intel feature flag expansion */
-         } else if (reg == 0x8000000a) {
-            print_8000000a_eax(words[WORD_EAX]);
-            print_8000000a_edx(words[WORD_EAX]);
-            print_8000000a_ebx(words[WORD_EBX]);
-         } else if (0x8000000b <= reg && reg <= 0x80000018) {
-            /* reserved for vendors to be determined feature flag expansion */
-         } else {
-            printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
-                   (unsigned int)reg,
-                   words[WORD_EAX], words[WORD_EBX],
-                   words[WORD_ECX], words[WORD_EDX]);
-         }
-      }
-
-      basic_max = 0x80860000;
-      for (reg = 0x80860000; reg <= basic_max; reg++) {
-         boolean       success;
-         unsigned int  words[4];
-
-         success = read_reg(cpuid_fd, reg, words, TRUE);
-         if (!success) break;
-
-         if (opt_raw) {
-            if (reg == 0x80860000) {
-               basic_max = words[WORD_EAX];
-            }
-            printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
-                   reg,
-                   words[WORD_EAX], words[WORD_EBX],
-                   words[WORD_ECX], words[WORD_EDX]);
-         } else if (reg == 0x80860000) {
-            basic_max = words[WORD_EAX];
-         } else if (reg == 0x80860001) {
-            print_80860001_eax(words[WORD_EAX]);
-            print_80860001_edx(words[WORD_EDX]);
-            print_80860001_ebx_ecx(words[WORD_EBX], words[WORD_ECX]);
-         } else if (reg == 0x80860002) {
-            print_80860002_eax(words[WORD_EAX], &stash);
-            printf("   Transmeta CMS revision (0x80000002/ecx)"
-                   " = %u.%u-%u.%u-%u ", 
-                   (words[WORD_EBX] >> 24) & 0xff,
-                   (words[WORD_EBX] >> 16) & 0xff,
-                   (words[WORD_EBX] >>  8) & 0xff,
-                   (words[WORD_EBX] >>  0) & 0xff,
-                   words[WORD_ECX]);
-         } else if (reg == 0x80860003) {
-            memcpy(&stash.transmeta_info[0], words, sizeof(words));
-         } else if (reg == 0x80860004) {
-            memcpy(&stash.transmeta_info[16], words, sizeof(words));
-         } else if (reg == 0x80860005) {
-            memcpy(&stash.transmeta_info[32], words, sizeof(words));
-         } else if (reg == 0x80860006) {
-            memcpy(&stash.transmeta_info[48], words, sizeof(words));
-            printf("   Transmeta information = \"%s\"\n", stash.transmeta_info);
-         } else if (reg == 0x80860007) {
-            printf("   Transmeta core clock frequency = %u MHz\n",
-                   words[WORD_EAX]);
-            printf("   Transmeta processor voltage    = %u mV\n",
-                   words[WORD_EBX]);
-            printf("   Transmeta performance          = %u%%\n",
-                   words[WORD_ECX]);
-            printf("   Transmeta gate delay           = %u fs\n",
-                   words[WORD_EDX]);
-         } else {
-            printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
-                   (unsigned int)reg,
-                   words[WORD_EAX], words[WORD_EBX],
-                   words[WORD_ECX], words[WORD_EDX]);
-         }
-      }
-
-      basic_max = 0xc0000000;
-      for (reg = 0xc0000000; reg <= basic_max; reg++) {
-         boolean       success;
-         unsigned int  words[4];
-
-         success = read_reg(cpuid_fd, reg, words, TRUE);
-         if (!success) break;
-
-         if (opt_raw) {
-            if (reg == 0xc0000000) {
-               basic_max = words[WORD_EAX];
-            }
-            printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
-                   reg,
-                   words[WORD_EAX], words[WORD_EBX],
-                   words[WORD_ECX], words[WORD_EDX]);
-         } else if (reg == 0xc0000000) {
-            basic_max = words[WORD_EAX];
-         } else if (reg == 0xc0000001) {
-            if (stash.vendor == VENDOR_VIA) {
-               printf("   0x%08x: eax=0x%08x\n", 
-                      (unsigned int)reg, words[WORD_EAX]);
-               print_c0000001_edx(words[WORD_EDX]);
-            } else {
-               /* DO NOTHING */
-            }
-         } else {
-            printf("   0x%08x: eax=0x%08x ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
-                   (unsigned int)reg,
-                   words[WORD_EAX], words[WORD_EBX],
-                   words[WORD_ECX], words[WORD_EDX]);
-         }
-      }
-      
-      if (!opt_raw) {
-         print_mp_synth(stash.vendor,
-                        stash.val_1_ebx, 
-                        stash.val_1_edx, 
-                        stash.val_4_eax,
-                        stash.val_80000001_ecx,
-                        stash.val_80000008_ecx);
-         print_synth(&stash);
-      }
-
-      close(cpuid_fd);
+   if (opt_filename != NULL) {
+      do_file(opt_filename, opt_one_cpu, opt_raw);
+   } else {
+      do_real(opt_one_cpu, opt_raw);
    }
 
    exit(0);

@@ -61,7 +61,7 @@ $(PACKAGE).spec: $(PACKAGE).proto.spec
 	  echo "%define release $(RELEASE)"; \
 	  cat $<) > $@
 
-$(SRC_TAR): $(SRCS) $(OTHER_SRCS) Makefile
+$(SRC_TAR): $(SRCS) $(OTHER_SRCS)
 	@echo Tarring source
 	@rm -rf $(PACKAGE)-$(VERSION)
 	@mkdir $(PACKAGE)-$(VERSION)
