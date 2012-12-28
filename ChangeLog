@@ -1,3 +1,12 @@
+Mon Apr  3 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added code to distinguish between the two different Dual-Core
+	Xeon (Paxville A0) and Dual-Core Xeon Processor 7000 (Paxville A0).  
+	Empirically, the significant differences are the VMX flag and the
+	"execution disable" flag.  The VMX flag is in an Intel-defined
+	CPUID function, so it's used.  Thanks to Jason Nicholls for providing
+	the Dual-Core Xeon (Paxville A0) output that made this possible.
+	* cpuid.c: Added detection for Xeon Processor LV (Sossaman C0).
+
 Mon Mar 13 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Fixed code that distinguished processors based on
 	  presence or absence of L3 cache.  Some of the cache codes weren't

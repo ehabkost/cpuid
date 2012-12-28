@@ -229,6 +229,7 @@ typedef enum {
    MP, /* Mobile Pentium                                                      */
    sX, /*        Xeon                                                         */
    sI, /*        Xeon (Irwindale)                                             */
+   s7, /*        Xeon (Series 7000)                                           */
    sM, /*        Xeon MP                                                      */
    sP, /*        Xeon MP (Potomac)                                            */
    MM, /* Mobile Pentium M                                                    */
@@ -263,6 +264,7 @@ typedef struct {
    vendor_t       vendor;
    unsigned int   val_1_eax;
    unsigned int   val_1_ebx;
+   unsigned int   val_1_ecx;
    unsigned int   val_1_edx;
    unsigned int   val_4_eax;
    unsigned int   val_80000001_ebx;
@@ -287,7 +289,7 @@ typedef struct {
    boolean       L3;            /* Cranford lacks, Potomac has */
 } code_stash_t;
 
-#define NIL_STASH { VENDOR_UNKNOWN, 0, 0, 0, 0, 0, 0, 0, 0, "", "",  \
+#define NIL_STASH { VENDOR_UNKNOWN, 0, 0, 0, 0, 0, 0, 0, 0, 0, "", "",  \
                     FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE }
 
 static void
@@ -553,6 +555,40 @@ specialize_intel_cache(code_t               result,
    return result;
 }
 
+#define IS_VMX(val_1_ecx)  (BIT_EXTRACT_LE((val_1_ecx), 5, 6))
+
+static code_t
+specialize_intel_VT(code_t               result,
+                    const code_stash_t*  stash)
+{
+   if (stash->vendor == VENDOR_INTEL) {
+      switch (result) {
+      case sX:
+         switch (__XFMS(stash->val_1_eax)) {
+         case _XF(0) + _F(15) + _M(4) + _S(8):
+            /*
+            ** Is this the best way to distinguish these two processors?
+            **    Dual-Core Xeon (Paxville A0)
+            **    Dual-Core Xeon Processor 7000 (Paxville A0)
+            ** Empirically, the significant differences are the VMX flag and
+            ** the "execution disable" flag.  The VMX flag is in an
+            ** Intel-defined CPUID function, so it's used.
+            */
+            if (IS_VMX(stash->val_1_ecx)) {
+               /* to distinguish Paxville Series 7000 from Paxville 2.80 GHz */
+               result = s7;
+            }
+         }
+         break;
+      default:
+         /* DO NOTHING */
+         break;
+      }
+   }
+
+   return result;
+}
+
 static code_t
 specialize_amd_model(code_t               result,
                      const code_stash_t*  stash)
@@ -645,6 +681,7 @@ decode(const code_stash_t*  stash)
    }
 
    result = specialize_intel_cache(result, stash);
+   result = specialize_intel_VT(result, stash);
    result = specialize_amd_model(result, stash);
 
    return result;
@@ -804,9 +841,14 @@ print_synth_intel(const char*   name,
    FMSC (   6, 13,  8, dC, "Intel Celeron M (Dothan C0), 90nm");
    FMS  (   6, 13,  8,     "Intel Pentium M (Dothan C0) / Celeron M (Dothan C0), 90nm");
    FM   (   6, 13,         "Intel Pentium M (Dothan) / Celeron M (Dothan), 90nm");
+   /*
+   ** Is MP the correct code for:
+   **    Intel Core Solo (Yonah C0) / Core Duo (Yonah C0)?
+   */
    FMSC (   6, 14,  8, MP, "Intel Core Solo (Yonah C0) / Core Duo (Yonah C0), 65nm");
-   FMS  (   6, 14,  8,     "Intel Core Solo (Yonah C0) / Core Duo (Yonah C0), 65nm");
-   FM   (   6, 14,         "Intel Core Solo (Yonah) / Core Duo (Yonah), 65nm");
+   FMSC (   6, 14,  8, sX, "Intel Xeon Processor LV (Sossaman C0), 65nm");
+   FMS  (   6, 14,  8,     "Intel Core Solo (Yonah C0) / Core Duo (Yonah C0) / Xeon Processor LV (Sossaman C0), 65nm");
+   FM   (   6, 14,         "Intel Core Solo (Yonah) / Core Duo (Yonah) / Xeon Processor LV (Sossaman), 65nm");
    F    (   6,             "Intel Pentium II / Pentium III / Pentium M / Celeron / Mobile Celeron / Celeron M / Core Solo / Core Duo (unknown model)");
    FMS  (   7,  6,  4,     "Intel Itanium (C0)");
    FMS  (   7,  7,  4,     "Intel Itanium (C1)");
@@ -882,11 +924,8 @@ print_synth_intel(const char*   name,
    XFMS (   0,  4,  3,     "Intel Pentium 4 (Prescott N0) / Xeon (Nocona N0 / Irwindale N0), 90nm");
    XFMS (   0,  4,  4,     "Intel Pentium D Processor 8x0 (Smithfield A0) / Pentium Extreme Edition Processor 840 (Smithfield A0), 90nm");
    XFMS (   0,  4,  7,     "Intel Pentium D Processor 8x0 (Smithfield B0) / Pentium Extreme Edition Processor 840 (Smithfield B0), 90nm");
-   /*
-   ** How to distinguish?
-   **    Dual-Core Xeon (Paxville A0)
-   **    Dual-Core Xeon Processor 7000 (Paxville A0)
-   */
+   XFMSC(   0,  4,  8, sX, "Intel Dual-Core Xeon (Paxville A0), 90nm");
+   XFMSC(   0,  4,  8, s7, "Intel Dual-Core Xeon Processor 7000 (Paxville A0), 90nm");
    XFMS (   0,  4,  8,     "Intel Dual-Core Xeon (Paxville A0) / Dual-Core Xeon Processor 7000 (Paxville A0), 90nm");
    XFMSC(   0,  4,  9, dP, "Intel Pentium 4 (Prescott G1), 90nm");
    XFMSC(   0,  4,  9, sM, "Intel Xeon MP (Cranford B0), 90nm");
@@ -1677,10 +1716,12 @@ static void print_mp_synth(vendor_t      vendor,
                            unsigned int  val_80000001_ecx,
                            unsigned int  val_80000008_ecx)
 {
-   // This logic based on the AMD CPUID Specification (25481).
-   // NOTE: The AMD CPUID documentation says that c always will be 0
-   //       on a single-core machine.  But Intel doesn't follow that
-   //       convention and uses 1 for a single-core machine.  So, cope.
+   /*
+   ** This logic based on the AMD CPUID Specification (25481).
+   ** NOTE: The AMD CPUID documentation says that c always will be 0
+   **       on a single-core machine.  But Intel doesn't follow that
+   **       convention and uses 1 for a single-core machine.  So, cope.
+   */
    printf("   (multi-processing synth): ");
    if (IS_HTT(val_1_edx)) {
       boolean       ok = TRUE;
@@ -3124,6 +3165,7 @@ main(int     argc,
             print_1_ecx(words[WORD_ECX]);
             stash.val_1_eax = words[WORD_EAX];
             stash.val_1_ebx = words[WORD_EBX];
+            stash.val_1_ecx = words[WORD_ECX];
             stash.val_1_edx = words[WORD_EDX];
          } else if (reg == 2) {
             unsigned int  max_tries = words[WORD_EAX] & 0xff;
