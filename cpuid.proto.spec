@@ -2,11 +2,12 @@ Summary: dumps CPUID information about the CPU(s)
 Name: cpuid
 Version: %{version}
 Release: %{release}
-Copyright: BSD
+License: GPL
 Group: System Environment/Base
 Source: cpuid-%{version}.src.tar.gz
 Packager: Todd Allen <cpuid@etallen.com>
 URL: http://www.etallen.com/cpuid.html
+BuildRoot: %{getenv:HOME}/rpmbuild/BUILDROOT/%{name}-%{version}-%{release}.%{_arch}
 %description
 cpuid dumps detailed information about the CPU(s) gathered from the CPUID 
 instruction, and also determines the exact model of CPU(s).
@@ -25,6 +26,6 @@ instruction, and also determines the exact model of CPU(s).
 
 %files
 %defattr(-,root,root)
-/usr/bin/cpuid
-/usr/share/man/man1/cpuid.1.gz
+%{_bindir}/cpuid
+%{_mandir}/man1/cpuid.1.gz
 %doc ChangeLog FUTURE LICENSE

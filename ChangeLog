@@ -1,3 +1,158 @@
+Tue Aug 31 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Rearranged synth rules and substantially simplified query
+	  macros into something like the form I was hoping for when I started
+	  this redesign.
+	* cpuid.c: Added changes from the new AMD CPUID document that claims to
+	  have been released in September 2010!
+	* cpuid.c: Changed raw dump to include %ecx values to accomodate CPUID
+	  functions with gaps in the useful %ecx range (e.g. 0xd).  The file
+	  parser accepts either the old or new forms.
+
+Mon Aug 30 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Semi-mechanically eliminated the codes used to
+	  disambiguate in the synth string and replaced them with queries,
+	  which I think will be more general-purpose and will allow me to
+	  eliminate a lot of the problem with codes appropriate for one
+	  model being a problem for subsequent models (e.g. the Core Solo
+	  vs. Core Duo distinction).  There still are general-purpose
+	  queries like there were general-purpose codes, but the
+	  special-case queries will only matter for those families that
+	  care about them.  This does mean that it's possible for multiple
+	  queries to register as true, so I have to be more careful with
+	  the order of chips in the synth tables.
+
+Fri Aug 27 2010 Todd Allen <todd.allen@etallen.com>
+	* Tested on a variety of CPUs.
+	* cpuid.c: Corrected Mobile Turion checking in decode_brand.
+	* cpuid.c: Added synth entries for 6/15/4 pre-production
+	  Conroe B0/Woodcrest B0.
+	* cpuid.c: Added synth entries for Santa Rosa F3 stepping
+	  (undocumented).
+	* cpuid.c: Fixed synth entries for Brisbane, Toledo, and Windsor to
+	  expect code DA (for dual-core Athlons).
+	* cpuid.c: Generalized the check for Intel Extreme Edition chips.
+	* cpuid.c: Added synth entries Core 2 Quad (Conroe) chips.
+	* cpuid.c: Added synth entry for VIA 6/13/0 chip.  Unfortunately, there
+	  is no documentation and very little anecdotal evidence of this chip,
+	  so the description is vague.
+	* cpuid.c: Added addition CPUID function 2 cache codes from Mike
+	  Stroyan.
+	* cpuid.c: Fixed some cut&paste errors that had EAX where it should
+	  have been EBX, as reported by Mike Stroyan
+	* cpuid.c: Added very short synth table for SiS chips.  I found no
+	  documentation on these, so I just have the one case.
+	* cpuid.c: Fixed the (synth) strings for oddball chips, which suffered
+	  from a cut&paste error.
+	* cpuid.c: Simplified some of the fallback strings that had grown
+	  ridiculously long.
+
+Thu Aug 26 2010 Todd Allen <todd.allen@etallen.com>
+	* Tested on a variety of CPUs.
+	* cpuid.c: Added more logic for Woodcrest pre-production chips.
+	* cpuid.c: Corrected synth logic for VIA Antaur chips.
+	* cpuid.c: Added synth for plain vanilla Thoroughbred Athlon.
+
+Wed Aug 25 2010 Todd Allen <todd.allen@etallen.com>
+	* Tested on a variety of CPUs.
+	* cpuid.c: Fixed a couple bugs with decoding processor numbers in
+	  print_synth_amd_model.
+
+Tue Aug 24 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Further changes to mp_synth decoding, including tracking
+	  of the decoding method used (there are around 4 major approaches,
+	  depending on how you count).
+	* cpuid.c: Added apic_synth decoding to find the appropriate field
+	  widths and decode the process local APIC physical ID.  This is useful
+	  in its own right, but also helps convince me that many Intel chips
+	  really do claim to have hyperthreads even though they don't.
+	* cpuid.c: Added support for direct instruction (-i) functionality to
+	  report on all CPUs by calling sched_setaffinity to reschedule the
+	  process on each CPU.  This is now the default behavior for -i, but
+	  it can be overridden with the -1 option.
+	* cpuid.c: added Barcelona B1 (undocumented chip) synth decoding.
+
+Mon Aug 23 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Made real_get pass the requested ecx values even when
+	  using -k.  Modern linux kernel expect the ecx values in the upper
+	  32 bits of the file offset (i.e. lseek64).
+	* cpuid.c: Worked out a fallback for determining mp_synth information
+	  for Intel chips which lack CPUID function 4.
+	* cpuid.c: Added mechanism for determining mp_synth information from
+	  CPUID function 11 information if it's available (because if it's
+	  present on Intel chips, it's the only reliable way; the older
+	  mechanisms return gibberish).
+
+Fri Aug 20 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c, cpuid.man: Added to synth even more Nehalem chips.
+	* cpuid.c: Added 6/15 model for VIA Nano, but there's very little
+	  detailed information on this chip, so that's it.
+	* cpuid.c: Corrected some AMD codename confusion from 2006:
+	  Dublin->ClawHammer/Odessa, Sonora->Dublin,
+	  Palermo(mobile)->Georgetown/Sonora, Lancaster->Lancaster/Richmond,
+	  Richmond->Taylor/Trinidad.
+	* cpuid.c: Overhauled the AMD model dumping code to understand new
+	  families.
+	* cpuid.c: Tweaked decode_mp_synth to use ApicIdCoreIdSize, per AMD's
+	  CPUID recommendations.
+
+Thu Aug 19 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c, cpuid.man: Updated synth tables for Intel Xeons.
+	* cpuid.c: Removed all the "How to distinguish" comments, since
+	  it seems to be very common for Intel to have indistinguishable
+	  processors nowadays (the old cache-checking tricks are unreliable
+	  now).
+	* cpuid.c, cpuid.man: Added to synth additional Nehalem chips as I'm
+	  able to hunt them down.
+
+Wed Aug 18 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c, cpuid.man: Updated synth tables for Intel Core 2, Atom,
+	  Celeron, and Pentium chips based on the same cores.
+
+Tue Aug 17 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c, cpuid.man: Updated synth tables for AMD family 10h (K10)
+	  and family 11h processors.
+	* cpuid.c: simplified print_x_synth_amd by pruning its table down to
+	  just the three families that differ from normal 1/eax simple synth,
+	  and falling back on 1/eax simple synth otherwise.
+
+Mon Aug 16 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added new steppings to synth tables using latest spec
+	  updates for all AMD processor families already in them.
+	* cpuid.c, cpuid.man: Updated synth tables for AMD family 0Fh (K8)
+	  processors.
+
+Fri Aug 13 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Updated raw data dump based on latest CPUID documentation
+	  from Intel & AMD.
+	* cpuid.c: Fixed dump of function 4 to iterate over all caches.
+
+Thu Aug 12 2010 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Reorganized synth tables to always use extended family
+	  and extended model numbers since they are so prevalent on modern
+	  chips.
+	* cpuid.c: Added new steppings to synth tables using latest spec
+	  updates for all Intel processor families already in them.
+
+Sun Nov 26 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Recognize Intel Core 2 Extreme Edition from brand string.
+	  Thanks to Tony Freitas for explaining that Ennnn means desktop while
+	  Xnnnn means Extreme Edition for those processors.
+
+Wed Nov 22 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Recognize Itanium2 Montecito C2.
+	* cpuid.c: Recognize Intel Core 2 Duo Mobile (Conroe B2).
+	* cpuid.c: Recognize Intel Quad-Core Xeon Processor 5300 (Woodcrest B3)
+	  and Intel Core 2 Extreme Quad-Core Processor QX6700 (Woodcrest B3).
+	* cpuid.c: Recognize Intel Celeron D Processor 36x (Cedar Mill D0).
+	* cpuid.c: Distinguish Core 2 Duo from Core 2 Extreme Edition based on
+	  presence or absence of hyperthreading.  Thanks to Tony Seacow for
+	  providing output for numerous processors and the advice about
+	  hyperthreading.
+
+Thu Nov  2 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Changed "number of logical CPU cores - 1" to "number of CPU
+	  cores - 1".
+
 Sun Sep 17 2006 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 	* cpuid.c: Made the cpuid instruction (-i, --inst options) the default.
@@ -6,14 +161,14 @@ Sun Sep 17 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Removed confusing CPU number from output when using
 	  the cpuid instruction.
 	* cpuid.man: Updated with new options.
-	* cpuid.c, Makefile: Changed i386 _llseek kludge to workaround 
+	* cpuid.c, Makefile: Changed i386 _llseek kludge to workaround
 	  offsets >= 0x80000000.  Now using -D_FILE_OFFSET_BITS=64 in the
 	  Makefile instead.  This should allow the i386 cpuid to work on
 	  an x86_64 system.
-	* cpuid.c: Added knowledge of CPU modules to synthesized field: Tulsa, 
+	* cpuid.c: Added knowledge of CPU modules to synthesized field: Tulsa,
 	  Woodcrest B1 (pre-production)
-	* cpuid.c: In synthesized model field, properly distinguish between 
-	  Intel Pentium D Processor 8x0 and Intel Pentium Extreme Edition 
+	* cpuid.c: In synthesized model field, properly distinguish between
+	  Intel Pentium D Processor 8x0 and Intel Pentium Extreme Edition
 	  Processor 840 (both Smithfields).
 	* cpuid.man: Added mention of new 7100 series spec updates.
 	* cpuid.spec: Changed Copyright to License.
@@ -26,11 +181,11 @@ Wed Aug 23 2006 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 
 Tue Aug 22 2006 Todd Allen <todd.allen@etallen.com>
-	* cpuid.c, cpuid.man: Added -i option to use the CPUID instruction 
+	* cpuid.c, cpuid.man: Added -i option to use the CPUID instruction
 	  directly instead of the CPUID kernel module.
-	* cpuid.c: Change Pentium Processor 9x0 to 9xx because of 9x5 
+	* cpuid.c: Change Pentium Processor 9x0 to 9xx because of 9x5
 	  processors.
-	* cpuid.man: Updated information about determining synthesized model 
+	* cpuid.man: Updated information about determining synthesized model
 	  information, and added information about determining synthesized
 	  multiprocessor information.
 
@@ -41,9 +196,9 @@ Sun Aug  6 2006 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 
 Sat Aug  5 2006 Todd Allen <todd.allen@etallen.com>
-	* cpuid.c: Added support for differentiating Core 2 Duo CPUs from Xeon 
+	* cpuid.c: Added support for differentiating Core 2 Duo CPUs from Xeon
 	  5100 CPUs based on the brand string.
-	* cpuid.c: Clarified that CPUID 4 ECX contains one less than the 
+	* cpuid.c: Clarified that CPUID 4 ECX contains one less than the
 	  number of sets.
 	* cpuid.c: Added support for CPUID 5 ecx & edx.
 	* cpuid.c: Added support for CPUID 6 ecx.
@@ -60,7 +215,7 @@ Wed Aug  2 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.man: Mention wikipedia pages for CPUs.
 
 Tue Aug  1 2006 Todd Allen <todd.allen@etallen.com>
-	* cpuid.c: On help screen, clarified that -f option reads output from 
+	* cpuid.c: On help screen, clarified that -f option reads output from
 	  -r option.
 	* cpuid.proto.spec: Used %{} macros for external command invocations.
 
@@ -72,7 +227,7 @@ Mon Jul 31 2006 Todd Allen <todd.allen@etallen.com>
 	  installations to have to be done by the root user, which is
 	  undesirable.
 	* cpuid.c: Improved identification for VIA C3 (Samuel WinChip C5A core).
-	* cpuid.c: Loosened up check for "Mobile AMD Athlon(tm) XP" by 
+	* cpuid.c: Loosened up check for "Mobile AMD Athlon(tm) XP" by
 	  removing "-M" suffix.
 	* cpuid.c: Recognize mobile Athlon XP (Thoroughbred).
 
@@ -92,18 +247,18 @@ Sun Jul 30 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Added Celeron Yonah C0.
 	* cpuid.c: Added Core Yonah D0.
 	* cpuid.c: Added Xeon Nocona R0 / Irwindale R0 stepping.
-	* cpuid.c: Added Pentium 4 Cedar Mill C1, Pentium D Presler C1, and 
+	* cpuid.c: Added Pentium 4 Cedar Mill C1, Pentium D Presler C1, and
 	  Xeon Dempsey C1.
 	* cpuid.c: Added Xeon Woodcrest B2.
-	* cpuid.c: Added Core 2 Conroe B1 & B2 & Core 2 Extreme Processor B1 & 
+	* cpuid.c: Added Core 2 Conroe B1 & B2 & Core 2 Extreme Processor B1 &
 	  B2.
 	* cpuid.c: Updated Itanium2 processors.
 	* cpuid.man: Added Intel specification updates for new CPUs.
 
 Wed Jul 26 2006 Todd Allen <todd.allen@etallen.com>
-	* cpuid.c: In decode_brand, added check for "Athlon(TM) XP", equivalent 
+	* cpuid.c: In decode_brand, added check for "Athlon(TM) XP", equivalent
 	  to "Athlon(tm) XP".
-	* cpuid.c: Fixed "80000002" typo in print_80860002_eax().  
+	* cpuid.c: Fixed "80000002" typo in print_80860002_eax().
 
 Mon Jul 24 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Distinguish properly between Core Solo, Core Duo, and
@@ -127,7 +282,7 @@ Fri Apr  7 2006 Todd Allen <todd.allen@etallen.com>
 Mon Apr  3 2006 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 	* cpuid.c: Added code to distinguish between the two different Dual-Core
-	  Xeon (Paxville A0) and Dual-Core Xeon Processor 7000 (Paxville A0).  
+	  Xeon (Paxville A0) and Dual-Core Xeon Processor 7000 (Paxville A0).
 	  Empirically, the significant differences are the VMX flag and the
 	  "execution disable" flag.  The VMX flag is in an Intel-defined
 	  CPUID function, so it's used.  Thanks to Jason Nicholls for providing
@@ -151,11 +306,11 @@ Wed Feb 22 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c: Fixed cut & paste header error in print_8000000a_eax.
 
 Tue Feb 21 2006 Todd Allen <todd.allen@etallen.com>
-	* cpuid.c: Renamed "hyper-threading technology" field to 
+	* cpuid.c: Renamed "hyper-threading technology" field to
 	  "hyper-threading / multi-core supported" to eliminate some confusing
 	  situations, such as Northwood chips which nominally support hyper-
 	  threading, but where it is disabled in the chip; or where hyper-
-	  threading is disabled in the BIOS; or AMD multi-core chips, which 
+	  threading is disabled in the BIOS; or AMD multi-core chips, which
 	  indicate TRUE here, but all of which lack hyper-threading at present.
 	* cpuid.c: Updated family 15 description, which had grown very stale.
 	* cpuid.c: Generalized Intel Pentium D Processor 900 to 9x0.
@@ -164,8 +319,8 @@ Tue Feb 21 2006 Todd Allen <todd.allen@etallen.com>
 Wed Feb  8 2006 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 	* cpuid.c: Use defined(i386) instead of __LONG_MAX__ to determine
-	  whether or not it's necessary to use _llseek().  Fixes handling of 
-	  functions >= 2**31 on some build systems, like the one I used to 
+	  whether or not it's necessary to use _llseek().  Fixes handling of
+	  functions >= 2**31 on some build systems, like the one I used to
 	  build the binary rpm.  (D'oh!)  And also indirectly affects the
 	  (synth) field.
 	* cpuid.c: Fix a busted error check in read_reg() that caused it to
@@ -182,7 +337,7 @@ Tue Feb  7 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.man: Added -r/--raw description.
 	* cpuid.man: Clarified info used for (synth) field.
 	* cpuid.man: Fixed version number & date.
-	* Makefile: Reworked to make it easy for people other than me to build 
+	* Makefile: Reworked to make it easy for people other than me to build
 	  and install.
 	* cpuid.spec: Used new Makefile organization
 	* Makefile: Fixed production of spec file so that it's possible to

@@ -1,7 +1,7 @@
 CFLAGS=-g -Wall -Wshadow -Wcast-align -Wredundant-decls -Wbad-function-cast -Wcast-qual -Wwrite-strings -Waggregate-return -Wstrict-prototypes -Wmissing-prototypes -D_FILE_OFFSET_BITS=64 -DVERSION=$(VERSION)
 
 PACKAGE=cpuid
-VERSION=$(shell date +%Y%m%d)
+VERSION=20100831
 RELEASE=1
 ARCH=i386
 
@@ -22,14 +22,14 @@ OTHER_BINS=$(PROG).man
 REL_DIR=../$(shell date +%Y-%m-%d)
 WEB_DIR=/toad1/apps.mine/www/www/$(PROG)
 
-DEV_X86_64_HOST=iggy
+DEV_X86_64_HOST=toad
 
 BUILDROOT=
 
 default: $(PROG) $(PROG).man.gz
 
 $(PROG): cpuid.c Makefile
-	$(CC) $(CFLAGS) -o $@ cpuid.c
+	$(CC) -m32 $(CFLAGS) -o $@ cpuid.c
 
 $(PROG).man.gz: $(PROG).man
 	gzip < $< > $@
@@ -87,7 +87,7 @@ $(RPMS) $(DEBUG_RPM): $(SRC_TAR) $(PACKAGE).spec
 	@echo Building RPMs
 	@rm -rf build
 	@mkdir build
-	@rpmbuild -ba \
+	@rpmbuild -ba --target "${ARCH}" \
 	          --buildroot "${PWD}/build" \
 	          --define "_builddir ${PWD}/build" \
 	          --define "_rpmdir ${PWD}" \
