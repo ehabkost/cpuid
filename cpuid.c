@@ -157,7 +157,9 @@ typedef enum {
    VENDOR_NEXGEN,
    VENDOR_RISE,
    VENDOR_SIS,
-   VENDOR_NSC
+   VENDOR_NSC,
+   VENDOR_VORTEX,
+   VENDOR_RDC
 } vendor_t;
 
 typedef enum {
@@ -264,7 +266,7 @@ typedef struct {
          boolean    athlon;
          boolean    sempron;
          boolean    phenom;
-         boolean    v_series;
+         boolean    series;
          boolean    geode;
          boolean    turion;
          boolean    neo;
@@ -272,6 +274,7 @@ typedef struct {
          boolean    athlon_mp;
          boolean    duron_mp;
          boolean    opteron;
+         boolean    fx;
 
          boolean    embedded;
          int        cores;
@@ -320,6 +323,7 @@ typedef struct {
                         FALSE, FALSE, FALSE, FALSE }, \
                       { FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, \
                         FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, \
+                        FALSE, \
                         FALSE, 0 } }, \
                     { FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE }, \
                     FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, \
@@ -781,11 +785,16 @@ decode_amd_model(const code_stash_t*  stash,
 #undef ZZ
 #undef YY
    } else if (__F(stash->val_1_eax) == _XF(1) + _F(15)
-              || __F(stash->val_1_eax) == _XF(2) + _F(15)) {
+              || __F(stash->val_1_eax) == _XF(2) + _F(15)
+              || __F(stash->val_1_eax) == _XF(3) + _F(15)
+              || __F(stash->val_1_eax) == _XF(5) + _F(15)) {
       /*
       ** Algorithm from:
       **    AMD Revision Guide for AMD Family 10h Processors (41322 Rev 3.74)
       **    AMD Revision Guide for AMD Family 11h Processors (41788 Rev 3.08)
+      **    AMD Revision Guide for AMD Family 12h Processors (44739 Rev 3.10)
+      **    AMD Revision Guide for AMD Family 14h Models 00h-0Fh Processors
+      **    (47534 Rev 3.00)
       ** But using only the Processor numbers.
       */
       unsigned int  str1;
@@ -811,7 +820,7 @@ decode_amd_model(const code_stash_t*  stash,
 
       /* 
       ** In every String2 Values table, there were special cases for
-      ** pg == 0 && str2 == 15 which defined them as a the empty string.
+      ** pg == 0 && str2 == 15 which defined them as the empty string.
       ** But that produces the same result as an undefined string, so
       ** don't bother trying to handle them.
       */
@@ -1032,7 +1041,7 @@ decode_amd_model(const code_stash_t*  stash,
             break;
          }
       } else if (__F(stash->val_1_eax) == _XF(2) + _F(15)) {
-         /* Family 10h tables */
+         /* Family 11h tables */
          switch (pkgtype) {
          case 2:
             /* 41788 3.08: table 3: String1 Values for S1g2 Processors */
@@ -1057,53 +1066,62 @@ decode_amd_model(const code_stash_t*  stash,
             s2 = NULL;
             break;
          }
-      } else {
-         s1 = NULL;
-         s2 = NULL;
-      }
+      } else if (__F(stash->val_1_eax) == _XF(3) + _F(15)) {
+         partialmodel--;
 
-#undef NC
-#undef PG
-#undef STR1
-#undef STR2
+         /* Family 12h tables */
+         switch (pkgtype) {
+         case 1:
+            /* 44739 3.10: table 6: String1 Values for FS1 Processors */ 
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(1) + STR1(3): *brand_pre = "AMD"; s1 = "A4-33"; break;
+            case PG(0) + NC(1) + STR1(5): *brand_pre = "AMD"; s1 = "E2-30"; break;
+            case PG(0) + NC(3) + STR1(1): *brand_pre = "AMD"; s1 = "A8-35"; break;
+            case PG(0) + NC(3) + STR1(3): *brand_pre = "AMD"; s1 = "A6-34"; break;
+            default:                                          s1 = NULL;    break;
+            }
+            /* 44739 3.10: table 7: String2 Values for FS1 Processors */ 
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(1) + STR2(1):  s2 = "M";  break;
+            case PG(0) + NC(1) + STR2(2):  s2 = "MX"; break;
+            case PG(0) + NC(3) + STR2(1):  s2 = "M";  break;
+            case PG(0) + NC(3) + STR2(2):  s2 = "MX"; break;
+            default:                       s2 = NULL; break;
+            }
+         case 2:
+            /* 44739 3.10: table 8: String1 Values for FM1 Processors */ 
+            switch (PG(pg) + NC(nc) + STR1(str1)) {
+            case PG(0) + NC(1) + STR1(1):  *brand_pre = "AMD";                   s1 = "A4-33"; break;
+            case PG(0) + NC(1) + STR1(2):  *brand_pre = "AMD";                   s1 = "E2-32"; break;
+            case PG(0) + NC(1) + STR1(4):  *brand_pre = "AMD Athlon(tm) II X2";  s1 = "2";     break;
+            case PG(0) + NC(1) + STR1(5):  *brand_pre = "AMD";                   s1 = "A4-34"; break;
+            case PG(0) + NC(1) + STR1(12): *brand_pre = "AMD Sempron(tm) X2";    s1 = "1";     break;
+            case PG(0) + NC(2) + STR1(5):  *brand_pre = "AMD";                   s1 = "A6-35"; break;
+            case PG(0) + NC(3) + STR1(5):  *brand_pre = "AMD";                   s1 = "A8-38"; break;
+            case PG(0) + NC(3) + STR1(6):  *brand_pre = "AMD";                   s1 = "A6-36"; break;
+            case PG(0) + NC(3) + STR1(13): *brand_pre = "AMD Athlon(tm) II X4";  s1 = "6";     break;
+            default:                                                             s1 = NULL;    break;
+            }
+            /* 44739 3.10: table 9: String2 Values for FM1 Processors */ 
+            switch (PG(pg) + NC(nc) + STR2(str2)) {
+            case PG(0) + NC(1) + STR2(1):  s2 = " APU with Radeon(tm) HD Graphics"; break;
+            case PG(0) + NC(1) + STR2(2):  s2 = " Dual-Core Processor";             break;
+            case PG(0) + NC(2) + STR2(1):  s2 = " APU with Radeon(tm) HD Graphics"; break;
+            case PG(0) + NC(3) + STR2(1):  s2 = " APU with Radeon(tm) HD Graphics"; break;
+            case PG(0) + NC(3) + STR2(3):  s2 = " Quad-Core Processor";             break;
+            default:                       s2 = NULL;                               break;
+            }
+         default:
+            s1 = NULL;
+            s2 = NULL;
+            break;
+         }
+      } else if (__F(stash->val_1_eax) == _XF(5) + _F(15)) {
+         partialmodel--;
 
-      if (s1 != NULL) {
-         char*  p = proc;
-         p += sprintf(p, "%s%02d", s1, partialmodel);
-         if (s2) sprintf(p, "%s", s2);
-      }
-   } else if (__F(stash->val_1_eax) == _XF(5) + _F(15)) {
-      /*
-      ** Algorithm from:
-      **    AMD Revision Guide for AMD Family 14h Models 00h-0Fh Processors
-      **    (47534 Rev 3.00)
-      ** But using only the Processor numbers.
-      */
-      unsigned int  str1;
-      unsigned int  str2;
-      unsigned int  pg;
-      unsigned int  partialmodel;
-      unsigned int  pkgtype;
-      unsigned int  nc;
-      const char*   s1;
-      const char*   s2;
-
-      str2         = BIT_EXTRACT_LE(stash->val_80000001_ebx,  0,  4);
-      partialmodel = BIT_EXTRACT_LE(stash->val_80000001_ebx,  4, 11);
-      str1         = BIT_EXTRACT_LE(stash->val_80000001_ebx, 11, 15);
-      pg           = BIT_EXTRACT_LE(stash->val_80000001_ebx, 15, 16);
-      pkgtype      = BIT_EXTRACT_LE(stash->val_80000001_ebx, 28, 32);
-      nc           = BIT_EXTRACT_LE(stash->val_80000008_ecx,  0,  8);
-
-#define NC(nc)            ((nc)   << 9)
-#define PG(pg)            ((pg)   << 8)
-#define STR1(str1)        ((str1) << 4)
-#define STR2(str2)        (str2)
-
-      partialmodel--;
-
-      switch (pkgtype) {
-      case 0:
+         /* Family 14h Models 00h-0Fh tables */
+         switch (pkgtype) {
+         case 0:
             /* 47534 3.00: table 4: String1 Values for FT1 Processors */
             switch (PG(pg) + NC(nc) + STR1(str1)) {
             case PG(0) + NC(0) + STR1(1): *brand_pre = "AMD"; s1 = "C-";  break;
@@ -1146,12 +1164,20 @@ decode_amd_model(const code_stash_t*  stash,
             default:                       s2 = NULL; break;
             }
             break;
-         break;
-      default:
+         default:
+            s1 = NULL;
+            s2 = NULL;
+            break;
+         }
+      } else {
          s1 = NULL;
          s2 = NULL;
-         break;
       }
+
+#undef NC
+#undef PG
+#undef STR1
+#undef STR2
 
       if (s1 != NULL) {
          char*  p = proc;
@@ -1202,7 +1228,6 @@ stash_intel_cache(code_stash_t*  stash,
    case 0x43: stash->L2_4w_512K   = TRUE; break;
    case 0x44: stash->L2_4w_1Mor2M = TRUE; break;
    case 0x45: stash->L2_4w_1Mor2M = TRUE; break;
-   case 0x76: stash->L2_4w_1Mor2M = TRUE; break;
    case 0x80: stash->L2_8w_512K   = TRUE; break;
    case 0x82: stash->L2_8w_256K   = TRUE; break;
    case 0x83: stash->L2_8w_512K   = TRUE; break;
@@ -1212,8 +1237,8 @@ stash_intel_cache(code_stash_t*  stash,
 
    switch (value) {
    case 0x45:
+   case 0x7d:
    case 0x85:
-   case 0x88: 
       stash->L2_2M = TRUE; 
       break;
    }
@@ -1360,7 +1385,7 @@ decode_brand_string(const char*    brand,
    stash->br.athlon      = strstr(brand, "Athlon") != NULL;
    stash->br.sempron     = strstr(brand, "Sempron") != NULL;
    stash->br.phenom      = strstr(brand, "Phenom") != NULL;
-   stash->br.v_series    = strstr(brand, "V-Series") != NULL;
+   stash->br.series      = strstr(brand, "Series") != NULL;
    stash->br.geode       = strstr(brand, "Geode") != NULL;
    stash->br.turion      = strstr(brand, "Turion") != NULL;
    stash->br.neo         = strstr(brand, "Neo") != NULL;
@@ -1368,6 +1393,7 @@ decode_brand_string(const char*    brand,
    stash->br.athlon_mp   = strstr(brand, "Athlon(tm) MP") != NULL;
    stash->br.duron_mp    = strstr(brand, "Duron(tm) MP") != NULL;
    stash->br.opteron     = strstr(brand, "Opteron") != NULL;
+   stash->br.fx          = strstr(brand, "AMD FX") != NULL;
 
    stash->br.embedded    = strstr(brand, "Embedded") != NULL;
    if (strstr(brand, "Dual Core") != NULL
@@ -1455,7 +1481,7 @@ decode_brand_stash(code_stash_t*  stash)
 #define pK ((stash->L2_4w_512K || stash->L2_8w_256K || stash->L2_8w_512K) \
             && !stash->L2_4w_1Mor2M && !stash->L2_8w_1Mor2M)
 /* Irwindale, distinguished from Nocona */
-#define sI (sX && stash->L3)
+#define sI (sX && stash->L2_2M)
 /* Potomac, distinguished from Cranford */
 #define sP (sM && stash->L3)
 /* Allendale, distinguished from Conroe */
@@ -1497,19 +1523,21 @@ decode_brand_stash(code_stash_t*  stash)
 ** ?A = think Athlon
 ** ?X = think Athlon XP
 ** ?L = think Athlon XP (LV)
+** ?f = think FX
 ** ?F = think Athlon FX
 ** ?D = think Duron
 ** ?S = think Sempron
 ** ?O = think Opteron
 ** ?T = think Turion
 ** ?p = think Phenom
-** ?V = think V-Series
+** ?s = think ?-Series
 ** ?n = think Turion Neo
 ** ?N = think Neo
 */
 #define dA (is_amd && !is_mobile && stash->br.athlon)
 #define dX (is_amd && !is_mobile && stash->br.athlon_xp)
 #define dF (is_amd && !is_mobile && stash->br.athlon_fx)
+#define df (is_amd && !is_mobile && stash->br.fx)
 #define dD (is_amd && !is_mobile && stash->br.duron)
 #define dS (is_amd && !is_mobile && stash->br.sempron)
 #define dO (is_amd && !is_mobile && stash->br.opteron)
@@ -1522,7 +1550,7 @@ decode_brand_stash(code_stash_t*  stash)
 #define MD (is_amd && is_mobile && stash->br.duron)
 #define MS (is_amd && is_mobile && stash->br.sempron)
 #define Mp (is_amd && is_mobile && stash->br.phenom)
-#define MV (is_amd && is_mobile && stash->br.v_series)
+#define Ms (is_amd && is_mobile && stash->br.series)
 #define MG (is_amd && stash->br.geode)
 #define MT (is_amd && stash->br.turion)
 #define Mn (is_amd && stash->br.turion && stash->br.neo)
@@ -1685,7 +1713,7 @@ debug_queries(const code_stash_t*  stash)
    DEBUGQ(MA);
    DEBUGQ(MS);
    DEBUGQ(Mp);
-   DEBUGQ(MV);
+   DEBUGQ(Ms);
    DEBUGQ(Mn);
    DEBUGQ(MN);
    DEBUGQ(MT);
@@ -1872,10 +1900,10 @@ print_synth_intel(const char*          name,
    FMSQ(    0, 6,  0,13,  6, dC, "Intel Celeron M (Dothan B1), 90nm");
    FMSQ(    0, 6,  0,13,  6, dP, "Intel Pentium M (Dothan B1), 90nm");
    FMS (    0, 6,  0,13,  6,     "Intel Pentium M (Dothan B1) / Celeron M (Dothan B1), 90nm");
-   FMSQ(    0, 6,  0,13,  8, dC, "Intel Celeron M (Dothan C0), 90nm");
+   FMSQ(    0, 6,  0,13,  8, dC, "Intel Celeron M (Dothan C0), 90nm/65nm");
    FMSQ(    0, 6,  0,13,  8, MP, "Intel Processor A100/A110 (Stealey C0), 90nm");
    FMSQ(    0, 6,  0,13,  8, dP, "Intel Pentium M (Dothan C0), 90nm");
-   FMS (    0, 6,  0,13,  8,     "Intel Pentium M (Dothan C0) / Celeron M (Dothan C0) / A100/A110 (Stealey C0), 90nm");
+   FMS (    0, 6,  0,13,  8,     "Intel Pentium M (Dothan C0) / Celeron M (Dothan C0) / A100/A110 (Stealey C0), 90nm/65nm");
    FMQ (    0, 6,  0,13,     dC, "Intel Celeron M (Dothan), 90nm");
    FMQ (    0, 6,  0,13,     MP, "Intel Processor A100/A110 (Stealey), 90nm");
    FMQ (    0, 6,  0,13,     dP, "Intel Pentium M (Dothan), 90nm");
@@ -1944,7 +1972,7 @@ print_synth_intel(const char*          name,
    FMQ (    0, 6,  0,15,     dP, "Intel Pentium Dual-Core (Allendale), 65nm");
    FMQ (    0, 6,  0,15,     dC, "Intel Celeron M (Conroe) / Celeron (Merom) / Celeron Dual-Core (Allendale), 65nm");
    FM  (    0, 6,  0,15,         "Intel Core Duo / Core 2 Duo (Conroe / Allendale) / Core Duo Mobile (Merom) / Core 2 Duo Mobile (Merom) / Celeron (Merom) / Core 2 Extreme (Conroe) / Core 2 Extreme Quad-Core (Kentsfield) / Pentium Dual-Core (Allendale) / Celeron M (Conroe) / Celeron (Merom) / Celeron Dual-Core (Allendale) / Quad-Core Xeon (Kentsfield / Clovertown / Woodcrest) / Core 2 Extreme Quad-Core (Clovertown) / Xeon (Tigerton) / Dual-Core Xeon (Conroe / Woodcrest), 65nm");
-   FMS (    0, 6,  1, 5,  0,     "Intel EP80579 (Tolapai B0)");
+   FMS (    0, 6,  1, 5,  0,     "Intel EP80579 (Tolapai B0), 65nm");
    FMSQ(    0, 6,  1, 6,  1, MC, "Intel Celeron Processor 200/400/500 (Conroe-L/Merom-L A1), 65nm");
    FMSQ(    0, 6,  1, 6,  1, dC, "Intel Celeron M (Merom-L A1), 65nm");
    FMSQ(    0, 6,  1, 6,  1, Mc, "Intel Core 2 Duo Mobile (Merom A1), 65nm");
@@ -2033,25 +2061,49 @@ print_synth_intel(const char*          name,
    FMQ (    0, 6,  2, 5,     Mc, "Intel Core Mobile (Arrandale), 32nm");
    FMQ (    0, 6,  2, 5,     dc, "Intel Core (Clarkdale), 32nm");
    FM  (    0, 6,  2, 5,         "Intel Core (Clarkdale) / Core (Arrandale) / Pentium (Clarkdale) / Pentium Mobile (Arrandale) / Celeron Mobile (Arrandale) / Xeon (Clarkdale), 32nm");
-   FMS (    0, 6,  2, 6,  1,     "Intel Atom (Lincroft C0), 45nm");
-   FM  (    0, 6,  2, 6,         "Intel Atom (Lincroft), 45nm");
-   FMSQ(    0, 6,  2,10,  7, Xc, "Intel Mobile Core i7 Extreme (Sandy Bridge D2), 32nm");
-   FMSQ(    0, 6,  2,10,  7, Mc, "Intel Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
-   FMSQ(    0, 6,  2,10,  7, dc, "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 (Sandy Bridge D2), 32nm");
-   FMSQ(    0, 6,  2,10,  7, sX, "Intel Xeon E3-1200 (Sandy Bridge D2), 32nm");
-   FMS (    0, 6,  2,10,  7,     "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 / Mobile Core i7-2000 (Sandy Bridge D2) / Xeon E3-1200 (Sandy Bridge D2), 32nm");
-   FMQ (    0, 6,  2,10,     Xc, "Intel Mobile Core i7 Extreme (Sandy Bridge D2), 32nm");
-   FMQ (    0, 6,  2,10,     Mc, "Intel Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
-   FMQ (    0, 6,  2,10,     dc, "Intel Core i5-2000 / Core i7-2000 (Sandy Bridge D2), 32nm");
-   FM  (    0, 6,  2,10,         "Intel Core i5-2000 / Core i7-2000 / Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
+   FMS (    0, 6,  2, 6,  1,     "Intel Atom Z600 (Lincroft C0) / Atom E600 (Tunnel Creek B0/B1), 45nm");
+   FM  (    0, 6,  2, 6,         "Intel Atom Z600 (Lincroft) / Atom E600 (Tunnel Creek B0/B1), 45nm");
+   FMSQ(    0, 6,  2,10,  7, Xc, "Intel Mobile Core i7 Extreme (Sandy Bridge D2/J1/Q0), 32nm");
+   FMSQ(    0, 6,  2,10,  7, Mc, "Intel Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2/J1/Q0), 32nm");
+   FMSQ(    0, 6,  2,10,  7, dc, "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 (Sandy Bridge D2/J1/Q0), 32nm");
+   FMSQ(    0, 6,  2,10,  7, MC, "Intel Celeron 700/800 (Sandy Bridge J1/Q0), 32nm");
+   FMSQ(    0, 6,  2,10,  7, sX, "Intel Xeon E3-1200 (Sandy Bridge D2/J1/Q0), 32nm");
+   FMSQ(    0, 6,  2,10,  7, dP, "Intel Pentium G500/G600/G800 (Sandy Bridge Q0), 32nm");
+   FMS (    0, 6,  2,10,  7,     "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 / Mobile Core i7-2000 (Sandy Bridge D2/J1/Q0) / Pentium G500/G600/G800 (Sandy Bridge Q0) / Celeron 700/800 (Sandy Bridge J1/Q0) / Xeon E3-1200 (Sandy Bridge D2/J1/Q0), 32nm");
+   FMQ (    0, 6,  2,10,     Xc, "Intel Mobile Core i7 Extreme (Sandy Bridge), 32nm");
+   FMQ (    0, 6,  2,10,     Mc, "Intel Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge), 32nm");
+   FMQ (    0, 6,  2,10,     dc, "Intel Core i5-2000 / Core i7-2000 (Sandy Bridge), 32nm");
+   FMQ (    0, 6,  2,10,     MC, "Intel Celeron 700/800 (Sandy Bridge), 32nm");
+   FMQ (    0, 6,  2,10,     sX, "Intel Xeon E3-1200 (Sandy Bridge), 32nm");
+   FMQ (    0, 6,  2,10,     dP, "Intel Pentium G500/G600/G800 (Sandy Bridge), 32nm");
+   FM  (    0, 6,  2,10,         "Intel Core i5-2000 / Core i7-2000 / Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 / Pentium G500/G600/G800 / Celeron 700/800 / Xeon E3-1200 (Sandy Bridge), 32nm");
    FMSQ(    0, 6,  2,12,  2, dc, "Intel Core i7-900 / Core i7-980X (Gulftown B1), 32nm");
    FMSQ(    0, 6,  2,12,  2, sX, "Intel Xeon Processor 3600 (Westmere-EP B1) / Xeon Processor 5600 (Westmere-EP B1), 32nm");
    FMS (    0, 6,  2,12,  2,     "Intel Core i7-900 (Gulftown B1) / Core i7-980X (Gulftown B1) / Xeon Processor 3600 (Westmere-EP B1) / Xeon Processor 5600 (Westmere-EP B1), 32nm");
    FM  (    0, 6,  2,12,         "Intel Core (Gulftown) / Xeon (Westmere-EP), 32nm");
+   FMSQ(    0, 6,  2,13,  6, sX, "Intel Xeon E5-1600/2600 (Sandy Bridge-E C1), 32nm");
+   FMSQ(    0, 6,  2,13,  6, dP, "Intel Core i7-3800/3900 (Sandy Bridge-E C1), 32nm");
+   FMS (    0, 6,  2,13,  6,     "Intel Core i7-3800/3900 (Sandy Bridge-E C1) / Xeon E5-1600/2600 (Sandy Bridge-E C1), 32nm");
+   FMSQ(    0, 6,  2,13,  7, sX, "Intel Xeon E5-1600/2600 (Sandy Bridge-E C2/M1), 32nm");
+   FMSQ(    0, 6,  2,13,  7, dP, "Intel Core i7-3800/3900 (Sandy Bridge-E C2), 32nm");
+   FMS (    0, 6,  2,13,  7,     "Intel Core i7-3800/3900 (Sandy Bridge-E C2) / Xeon E5-1600/2600 (Sandy Bridge-E C2/M1), 32nm");
+   FMQ (    0, 6,  2,13,     sX, "Intel Xeon E5-1600/2600 (Sandy Bridge-E), 32nm");
+   FMQ (    0, 6,  2,13,     dP, "Intel Core i7-3800/3900 (Sandy Bridge-E), 32nm");
+   FM  (    0, 6,  2,13,         "Intel Core i7-3800/3900 (Sandy Bridge-E) / Xeon E5-1600/2600 (Sandy Bridge-E), 32nm");
    FMS (    0, 6,  2,14,  6,     "Intel Xeon Processor 7500 (Beckton D0), 45nm");
    FM  (    0, 6,  2,14,         "Intel Xeon (Beckton), 45nm");
    FMS (    0, 6,  2,15,  2,     "Intel Xeon E7-8800 / Xeon E7-4800 / Xeon E7-2800 (Westmere-EX A2), 32nm");
    FM  (    0, 6,  2,15,         "Intel Xeon E7-8800 / Xeon E7-4800 / Xeon E7-2800 (Westmere-EX), 32nm");
+   FMS (    0, 6,  3, 6,  1,     "Intel Atom D2000/N2000 (Cedarview B1/B2), 32nm");
+   FM  (    0, 6,  3, 6,         "Intel Atom D2000/N2000 (Cedarview), 32nm");
+   FMSQ(    0, 6,  3,10,  9, Mc, "Intel Mobile Core i7-3000 (Ivy Bridge E1), 22nm");
+   FMSQ(    0, 6,  3,10,  9, dc, "Intel Core i5-3000 (Ivy Bridge E1/N0/L1) / i7-3000 (Ivy Bridge E1), 22nm");
+   FMSQ(    0, 6,  3,10,  9, sX, "Intel Xeon E3-1200 (Ivy Bridge E1/N0/L1), 22nm");
+   FMS (    0, 6,  3,10,  9,     "Intel Core i5-3000 (Ivy Bridge E1/N0/L1) / i7-3000 (Ivy Bridge E1) / Mobile Core i7-3000 (Ivy Bridge E1) / Xeon E3-1200 (Ivy Bridge E1/N0/L1), 22nm");
+   FMQ (    0, 6,  3,10,     Mc, "Intel Mobile Core i7-3000 (Ivy Bridge), 22nm");
+   FMQ (    0, 6,  3,10,     dc, "Intel Core i5-3000 (Ivy Bridge) / i7-3000 (Ivy Bridge), 22nm");
+   FMQ (    0, 6,  3,10,     sX, "Intel Xeon E3-1200 (Ivy Bridge), 22nm");
+   FM  (    0, 6,  3,10,         "Intel Core i5-3000 (Ivy Bridge) / i7-3000 (Ivy Bridge) / Mobile Core i7-3000 (Ivy Bridge) / Xeon E3-1200 (Ivy Bridge), 22nm");
    FQ  (    0, 6,            sX, "Intel Xeon (unknown model)");
    FQ  (    0, 6,            se, "Intel Xeon (unknown model)");
    FQ  (    0, 6,            MC, "Intel Mobile Celeron (unknown model)");
@@ -2235,7 +2287,7 @@ print_synth_amd(const char*          name,
    FM  (0, 5,  0,10,         "AMD Geode LX");
    FM  (0, 5,  0,13,         "AMD K6-2+, K6-III+");
    F   (0, 5,                "AMD 5k86 / K6 / Geode (unknown model)");
-   FM  (0, 6,  0, 1,         "AMD Athlon, .25um");
+   FM  (0, 6,  0, 1,         "AMD Athlon (Argon), .25um");
    FM  (0, 6,  0, 2,         "AMD Athlon (K75 / Pluto / Orion), .18um");
    FMS (0, 6,  0, 3,  0,     "AMD Duron / mobile Duron (Spitfire A0)");
    FMS (0, 6,  0, 3,  1,     "AMD Duron / mobile Duron (Spitfire A2)");
@@ -2687,7 +2739,7 @@ print_synth_amd(const char*          name,
    FMSQ(1,15,  0, 6,  2, DA, "AMD Athlon II X2 (Regor DA-C2), 45nm");
    FMSQ(1,15,  0, 6,  2, dA, "AMD Athlon II (Sargas DA-C2), 45nm");
    FMS (1,15,  0, 6,  2,     "AMD Athlon II (Sargas DA-C2) / Athlon II X2 (Regor DA-C2) / Sempron II (Sargas DA-C2) / Athlon II Dual-Core Mobile (Regor DA-C2) / Sempron Mobile (Sargas DA-C2) / Turion II Dual-Core Mobile (Caspian DA-C2), 45nm");
-   FMSQ(1,15,  0, 6,  3, MV, "AMD V-Series Mobile (Champlain DA-C3), 45nm");
+   FMSQ(1,15,  0, 6,  3, Ms, "AMD V-Series Mobile (Champlain DA-C3), 45nm");
    FMSQ(1,15,  0, 6,  3, DS, "AMD Sempron II X2 (Regor DA-C3), 45nm");
    FMSQ(1,15,  0, 6,  3, dS, "AMD Sempron II (Sargas DA-C3), 45nm");
    FMSQ(1,15,  0, 6,  3, MT, "AMD Turion II Dual-Core Mobile (Champlain DA-C3), 45nm");
@@ -2696,7 +2748,7 @@ print_synth_amd(const char*          name,
    FMSQ(1,15,  0, 6,  3, DA, "AMD Athlon II X2 (Regor DA-C3), 45nm");
    FMSQ(1,15,  0, 6,  3, dA, "AMD Athlon II (Sargas DA-C3), 45nm");
    FMS (1,15,  0, 6,  3,     "AMD Athlon II (Sargas DA-C3) / Athlon II X2 (Regor DA-C2) / Sempron II (Sargas DA-C2) / Sempron II X2 (Regor DA-C3) / V-Series Mobile (Champlain DA-C3) / Athlon II Dual-Core Mobile (Champlain DA-C3) / Turion II Dual-Core Mobile (Champlain DA-C3) / Phenom II Dual-Core Mobile (Champlain DA-C3), 45nm");
-   FMQ (1,15,  0, 6,     MV, "AMD V-Series Mobile (Champlain), 45nm");
+   FMQ (1,15,  0, 6,     Ms, "AMD V-Series Mobile (Champlain), 45nm");
    FMQ (1,15,  0, 6,     MS, "AMD Sempron Mobile (Sargas), 45nm");
    FMQ (1,15,  0, 6,     DS, "AMD Sempron II X2 (Regor), 45nm");
    FMQ (1,15,  0, 6,     dS, "AMD Sempron II (Sargas), 45nm");
@@ -2735,12 +2787,21 @@ print_synth_amd(const char*          name,
    FMQ (2,15,  0, 3,     dA, "AMD Athlon (Lion), 65nm");
    FM  (2,15,  0, 3,         "AMD Turion X2 (Lion) / Athlon (Lion) / Sempron (Sable), 65nm");
    F   (2,15,                "AMD Turion X2 Mobile / Athlon / Athlon X2 / Sempron / Sempron X2, 65nm");
-   FMS (5,15,  0, 2,  0,     "AMD C-Series (Ontario ON-C0) / E-Series (Zacate ON-C0) / G-Series (Ontario/Zacat ON-C0) / Z-Series (Desna ON-C0), 40nm");
+   FMSQ(3,15,  0, 1,  0, dS, "AMD Sempron Dual-Core (Llano LN-B0), 32nm");
+   FMSQ(3,15,  0, 1,  0, dA, "AMD Athlon II Dual-Core (Llano LN-B0), 32nm");
+   FMSQ(3,15,  0, 1,  0, Ms, "AMD A-Series (Llano LN-B0) / E2-Series (Llano LN-B0), 32nm");
+   FMS (3,15,  0, 1,  0,     "AMD Sempron Dual-Core (Llano LN-B0) / Athlon II Dual-Core (Llano LN-B0) / A-Series (Llano LN-B0) / E2-Series (Llano LN-B0), 32nm");
+   FMQ (3,15,  0, 1,     dS, "AMD Sempron Dual-Core (Llano), 32nm");
+   FMQ (3,15,  0, 1,     dA, "AMD Athlon II Dual-Core (Llano), 32nm");
+   FMQ (3,15,  0, 1,     Ms, "AMD A-Series (Llano) / E2-Series (Llano), 32nm");
+   FM  (3,15,  0, 1,         "AMD Sempron Dual-Core (Llano) / Athlon II Dual-Core (Llano) / A-Series (Llano) / E2-Series (Llano), 32nm");
+   FMS (5,15,  0, 2,  0,     "AMD C-Series (Ontario ON-C0) / E-Series (Zacate ON-C0) / G-Series (Ontario/Zacate ON-C0) / Z-Series (Desna ON-C0), 40nm");
    FM  (5,15,  0, 2,         "AMD C-Series (Ontario) / E-Series (Zacate) / G-Series (Ontario/Zacat) / Z-Series (Desna), 40nm");
-   FMS (5,15,  0, 1,  0,     "AMD C-Series (Ontario ON-B0) / E-Series (Zacate ON-B0) / G-Series (Ontario/Zacat ON-B0) / Z-Series (Desna ON-B0), 40nm");
+   FMS (5,15,  0, 1,  0,     "AMD C-Series (Ontario ON-B0) / E-Series (Zacate ON-B0) / G-Series (Ontario/Zacate ON-B0) / Z-Series (Desna ON-B0), 40nm");
    FM  (5,15,  0, 1,         "AMD C-Series (Ontario) / E-Series (Zacate) / G-Series (Ontario/Zacat) / Z-Series (Desna), 40nm");
    F   (5,15,                "AMD C-Series / E-Series / G-Series / Z-Series, 40nm");
    FMSQ(6,15,  0, 1,  2, dO, "AMD Opteron 6200 (Interlagos OR-B2) / Opteron 4200 (Valencia OR-B2)");
+   FMSQ(6,15,  0, 1,  2, df, "AMD FX-Series (Zambezi OR-B2)");
    FMS (6,15,  0, 1,  2,     "AMD Opteron 6200 (Interlagos OR-B2) / Opteron 4200 (Valencia OR-B2) / AMD FX-Series (Zambezi OR-B2)");
    FMQ (6,15,  0, 1,     dO, "AMD Opteron 6200 (Interlagos) / Opteron 4200 (Valencia)");
    FM  (6,15,  0, 1,         "AMD Opteron 6200 (Interlagos) / Opteron 4200 (Valencia) / AMD FX-Series (Zambezi)");
@@ -2786,6 +2847,8 @@ print_synth_via(const char*   name,
 {
    printf(name);
    START;
+   FM (0, 5,  0, 4,     "VIA WinChip (C6)");
+   FM (0, 5,  0, 8,     "VIA WinChip 2 (C6-2)");
    FM (0, 6,  0, 6,     "VIA C3 (Samuel WinChip C5A core)");
    FM (0, 6,  0, 6,     "VIA C3 (Samuel WinChip C5A core)");
    FMS(0, 6,  0, 7,  0, "VIA C3 (Samuel 2 WinChip C5B core) / Eden ESP 4000/5000/6000");
@@ -2904,6 +2967,29 @@ print_synth_nsc(const char*   name,
 }
 
 static void
+print_synth_vortex(const char*   name,
+                   unsigned int  val)
+{
+   printf(name);
+   START;
+   FM (0,5,  0,2,     "Vortex86DX");
+   FM (0,5,  0,8,     "Vortex86MX");
+   DEFAULT           ("unknown");
+   printf("\n");
+}
+
+static void
+print_synth_rdc(const char*   name,
+                unsigned int  val)
+{
+   printf(name);
+   START;
+   FM (0,5,  0,8,     "RDC IAD 100");
+   DEFAULT           ("unknown");
+   printf("\n");
+}
+
+static void
 print_x_synth_amd(unsigned int  val)
 {
    printf("      (simple synth) = ");
@@ -3005,6 +3091,12 @@ print_synth_simple(unsigned int  val_eax,
    case VENDOR_NSC:
       print_synth_nsc("      (simple synth)  = ", val_eax);
       break;
+   case VENDOR_VORTEX:
+      print_synth_vortex("      (simple synth)  = ", val_eax);
+      break;
+   case VENDOR_RDC:
+      print_synth_rdc("      (simple synth)  = ", val_eax);
+      break;
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -3044,6 +3136,12 @@ print_synth(const code_stash_t*  stash)
       break;
    case VENDOR_NSC:
       print_synth_nsc("   (synth) = ", stash->val_1_eax);
+      break;
+   case VENDOR_VORTEX:
+      print_synth_vortex("   (synth) = ", stash->val_1_eax);
+      break;
+   case VENDOR_RDC:
+      print_synth_rdc("   (synth) = ", stash->val_1_eax);
       break;
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
@@ -3454,6 +3552,7 @@ print_1_ecx(unsigned int  value)
           { "OS-enabled XSAVE/XSTOR"                  , 27, 27, bools },
           { "AVX: advanced vector extensions"         , 28, 28, bools },
           { "F16C half-precision convert instruction" , 29, 29, bools },
+          { "RDRAND instruction"                      , 30, 30, bools },
           { "hypervisor guest status"                 , 31, 31, bools },
         };
 
@@ -3588,7 +3687,7 @@ static void print_2_meaning(unsigned char  value,
    case 0x71: printf("Trace cache: 16K-uop, 8-way");                     break;
    case 0x72: printf("Trace cache: 32K-uop, 8-way");                     break;
    case 0x73: printf("Trace cache: 64K-uop, 8-way");                     break;
-   case 0x76: printf("L2 cache: 1M, 4-way, 64 byte lines");              break;
+   case 0x76: printf("instruction TLB: 2M/4M pages, fully, 8 entries");  break;
    case 0x77: printf("L1 instruction cache: 16K, 4-way, sectored,"
                      " 64 byte lines");                                  break;
    case 0x78: printf("L2 cache: 1M, 4-way, 64 byte lines");              break;
@@ -3787,6 +3886,7 @@ print_6_ecx(unsigned int  value)
 {
    static named_item  names[]
       = { { "ACNT/MCNT supported performance measure" ,  0,  0, bools },
+          { "ACNT2 available"                         ,  1,  1, bools },
           { "performance-energy bias capability"      ,  3,  3, bools },
         };
 
@@ -3798,7 +3898,11 @@ static void
 print_7_ebx(unsigned int  value)
 {
    static named_item  names[]
-      = { { "BMI instruction"                         ,  3,  3, bools },
+      = { { "FSGSBASE instructions"                   ,  0,  0, bools },
+          { "BMI instruction"                         ,  3,  3, bools },
+          { "SMEP support"                            ,  7,  7, bools },
+          { "enhanced REP MOVSB/STOSB"                ,  9,  9, bools },
+          { "INVPCID instruction"                     , 10, 10, bools },
         };
 
    print_names(value, names, LENGTH(names, named_item),
@@ -3886,6 +3990,17 @@ print_b_ecx(unsigned int  value)
 
    print_names(value, names, LENGTH(names, named_item),
                /* max_len => */ 33);
+}
+
+static void
+print_d_1_eax(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "XSAVEOPT instruction"                    ,  0,  0, bools },
+        };
+
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
 }
 
 static void
@@ -4069,7 +4184,7 @@ print_80000001_eax_amd(unsigned int  value)
 static void
 print_80000001_eax_via(unsigned int  value)
 {
-   static ccstring  family[]   = { NULL,
+   static ccstring  family[16] = { NULL,
                                    NULL,
                                    NULL,
                                    NULL,
@@ -4092,7 +4207,7 @@ print_80000001_eax_via(unsigned int  value)
 static void
 print_80000001_eax_transmeta(unsigned int  value)
 {
-   static ccstring  family[]   = { NULL,
+   static ccstring  family[16] = { NULL,
                                    NULL,
                                    NULL,
                                    NULL,
@@ -4132,6 +4247,8 @@ print_80000001_eax(unsigned int  value,
    case VENDOR_RISE:
    case VENDOR_SIS:
    case VENDOR_NSC:
+   case VENDOR_VORTEX:
+   case VENDOR_RDC:
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -4307,6 +4424,8 @@ print_80000001_edx(unsigned int  value,
    case VENDOR_NEXGEN:
    case VENDOR_RISE:
    case VENDOR_SIS:
+   case VENDOR_VORTEX:
+   case VENDOR_RDC:
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -4374,6 +4493,8 @@ print_80000001_ecx(unsigned int  value,
    case VENDOR_RISE:
    case VENDOR_SIS:
    case VENDOR_NSC:
+   case VENDOR_VORTEX:
+   case VENDOR_RDC:
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -4456,6 +4577,8 @@ print_80000001_ebx(unsigned int  value,
    case VENDOR_RISE:
    case VENDOR_SIS:
    case VENDOR_NSC:
+   case VENDOR_VORTEX:
+   case VENDOR_RDC:
    case VENDOR_UNKNOWN:
       /* DO NOTHING */
       break;
@@ -4906,7 +5029,6 @@ print_8000001e_ecx(unsigned int  value)
                               NULL, NULL, NULL,
                               NULL, NULL, NULL };
 
-
    static named_item  names[]
       = { { "node ID"                                 ,  0,  7, NIL_IMAGES },
           { "nodes per processor"                     ,  8,  9, npp },
@@ -4920,7 +5042,7 @@ print_8000001e_ecx(unsigned int  value)
 static void
 print_80860001_eax(unsigned int  value)
 {
-   static ccstring  family[]   = { NULL,
+   static ccstring  family[16] = { NULL,
                                    NULL,
                                    NULL,
                                    NULL,
@@ -5000,6 +5122,7 @@ print_80860001_ebx_ecx(unsigned int  val_ebx,
    } else {
       print_transmeta_proc_rev_meaning(val_ebx);
    }
+   printf("\n");
 }
 
 static void
@@ -5015,6 +5138,8 @@ print_80860002_eax(unsigned int   value,
              (value >>  0) & 0xff);
 
       print_transmeta_proc_rev_meaning(value);
+
+      printf("\n");
 
       stash->transmeta_proc_rev = value;
    }
@@ -5219,6 +5344,10 @@ print_reg (unsigned int        reg,
          stash->vendor = VENDOR_SIS;
       } else if (IS_VENDOR_ID(words, "Geode by NSC")) {
          stash->vendor = VENDOR_NSC;
+      } else if (IS_VENDOR_ID(words, "Vortex86 SoC")) {
+         stash->vendor = VENDOR_VORTEX;
+      } else if (IS_VENDOR_ID(words, "Genuine  RDC")) {
+         stash->vendor = VENDOR_RDC;
       }
    } else if (reg == 1) {
       print_1_eax(words[WORD_EAX], stash->vendor);
@@ -5308,6 +5437,9 @@ print_reg (unsigned int        reg,
                 words[WORD_ECX], words[WORD_ECX]);
          printf("      XCR0 upper 32 bits valid bit field mask = 0x%08x\n",
                 words[WORD_EDX]);
+      } else if (try == 1) {
+         printf("   XSAVE features (0xd/1):\n");
+         print_d_1_eax(words[WORD_EAX]);
       } else if (try == 2) {
          printf("   YMM features (0xd/2):\n");
          printf("      YMM save state byte size                = 0x%08x (%u)\n",
@@ -5478,7 +5610,7 @@ print_reg (unsigned int        reg,
    } else if (reg == 0x80860002) {
       print_80860002_eax(words[WORD_EAX], stash);
       printf("   Transmeta CMS revision (0x80000002/ecx)"
-             " = %u.%u-%u.%u-%u ", 
+             " = %u.%u-%u.%u-%u\n", 
              (words[WORD_EBX] >> 24) & 0xff,
              (words[WORD_EBX] >> 16) & 0xff,
              (words[WORD_EBX] >>  8) & 0xff,
@@ -5744,6 +5876,8 @@ print_header (unsigned int  reg,
          printf("   cache and TLB information (2):\n");
       } else if (reg == 4) {
          printf("   deterministic cache parameters (4):\n");
+      } else if (reg == 7) {
+         printf("   extended feature flags (7):\n");
       } else if (reg == 0xb) {
          printf("   x2APIC features / processor topology (0xb):\n");
       } else if (reg == 0x40000003 && try == 0) {
@@ -5813,6 +5947,19 @@ do_real(boolean  one_cpu,
                print_header(reg, try, raw);
                print_reg(reg, words, raw, try, &stash);
                try++;
+               real_get(cpuid_fd, reg, words, try, FALSE);
+            }
+         } else if (reg == 7) {
+            unsigned int  try = 0;
+            unsigned int  max_tries;
+            for (;;) {
+               print_header(reg, try, raw);
+               print_reg(reg, words, raw, try, &stash);
+               if (try == 0) {
+                  max_tries = words[WORD_EAX];
+               }
+               try++;
+               if (try > max_tries) break;
                real_get(cpuid_fd, reg, words, try, FALSE);
             }
          } else if (reg == 0xb) {
@@ -5937,6 +6084,7 @@ do_file(ccstring  filename,
    unsigned int  cpu         = -1;
    unsigned int  try2        = -1;
    unsigned int  try4        = -1;
+   unsigned int  try7        = -1;
    unsigned int  tryb        = -1;
    unsigned int  try8000001d = -1;
    code_stash_t  stash;
@@ -5987,6 +6135,7 @@ do_file(ccstring  filename,
          }
          try2        = 0;
          try4        = 0;
+         try7        = 0;
          tryb        = 0;
          try8000001d = 0;
          {
@@ -6018,6 +6167,9 @@ do_file(ccstring  filename,
          } else if (reg == 4) {
             print_header(reg, try4, raw);
             print_reg(reg, words, raw, try4++, &stash);
+         } else if (reg == 7) {
+            print_header(reg, try7, raw);
+            print_reg(reg, words, raw, try7++, &stash);
          } else if (reg == 0xb) {
             print_header(reg, tryb, raw);
             print_reg(reg, words, raw, tryb++, &stash);

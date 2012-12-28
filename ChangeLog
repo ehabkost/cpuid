@@ -1,3 +1,31 @@
+Fri Jun  1 2012 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+
+Thu May 31 2012 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Updated CPUID feature flags.
+	* cpuid.c: Updated CPUID function 7 to support sub-leaves (mostly for
+	  future functionality that might be added to them).
+	* cpuid.c: Updated synth decoding for Intel Dothan C0 because some use
+	  65nm process now.
+	* cpuid.c: Updated Intel EP80579 synth to mention 65nm process.
+	* cpuid.c: Added synth decoding for Intel Atom E600 series.
+	* cpuid.c: Updated synth decoding for Intel Sandy Bridge D2 to include J1
+	  and Q0, which have the same CPUID.
+	* cpuid.c: Added synth decoding for Intel Atom D2000/N2000 (Cedarview).
+	* cpuid.c: Added synth decoding for Intel Sandy Bridge-E.
+	* cpuid.c: Added synth decoding for AMD Llano.
+	* cpuid.c: Improved distinction between AMD Interlagos & Zambezi.
+	* cpuid.c: Added synth decoding for RDC IAD 100.
+	* cpuid.c: Fixed some formatting bugs for Transmeta-specific leaves.
+	* cpuid.c: Added synth decoding for some of VIA's versions of WinChips.
+	* cpuid.man: Added mentions of spec updates for several Atoms, i7 for
+	  LGA-2011, and Xeon E5; and AMD 12h family.
+
+Wed May 30 2012 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Fixed ancient bug in distinguishing Irwindale from Nocona
+	  (they differ only by L2 cache size).
+	* cpuid.c: Added synth decoding for desktop and mobile Ivy Bridge.
+
 Sat Feb 25 2012 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 	* cpuid.c: Cleaned up hypervisor-specific leaves for KVM.
