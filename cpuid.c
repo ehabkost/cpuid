@@ -313,19 +313,24 @@ stash_intel_cache(code_stash_t*  stash,
       break;
    }
 
-   if (__F(stash->val_1_eax) > _F(6)) {
-      switch (value) {
-      case 0x22:
-      case 0x23:
-      case 0x25:
-      case 0x29:
-      case 0x88:
-      case 0x89:
-      case 0x8a:
-      case 0x8d:
-         stash->L3 = TRUE;
-         break;
-      }
+   switch (value) {
+   case 0x22:
+   case 0x23:
+   case 0x25:
+   case 0x29:
+   case 0x46:
+   case 0x47:
+   case 0x49:
+   case 0x4a:
+   case 0x4b:
+   case 0x4c:
+   case 0x4d:
+   case 0x88:
+   case 0x89:
+   case 0x8a:
+   case 0x8d:
+      stash->L3 = TRUE;
+      break;
    }
 }
 

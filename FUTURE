@@ -1,6 +1,6 @@
-2006 Q2 Dempsey (Xeon 5000) (like Presler) Tulsa 3.5GHz 16Mb + 2*1Mb (Xeon MP)
 2006 Q1 Yonah (mobile), Xeon LV: Sossaman (low-power server)
         Yonah: U1300, U1400
+2006 Q2 Dempsey (Xeon 5000) (like Presler) Tulsa 3.5GHz 16Mb + 2*1Mb (Xeon MP)
 2006 Q3 Conroe: Merom (mobile) Santa Rosa (mobile) Woodcrest (low-power server)
                 Contreau?
                 Merom Viiv: T5600 (single core); T7200, T7400, T7600
@@ -19,6 +19,9 @@
 ?       Gainestown 
 --------------------------------------------------------------------------------
 now     Mobile Sempron 3400+
+2006    Rev F: Santa Rosa Opteron 2xx/8xx, Santa Ana Opteron 1xx
+2006 Q2 Turion X2 (1.6GHz/512k*2, 1.8GHz/512k*2, 2.0GHz/512k*2, 1.6GHz/256k*2)
 ?       Athlon 5000+ (socket AM2)
 ?       Athlon FX 62 (socket AM2)
+2006 Q2 Rev G: Deerhound Opteron 2xx/8xx, ?hound Opteron 1xx
 2007 H1 K8L
