@@ -1,7 +1,7 @@
 .\"
-.\" $Id: cpuid.man,v 20060823 2006/08/23 07:35:00 todd $
+.\" $Id: cpuid.man,v 20060917 2006/09/17 22:41:00 todd $
 .\"
-.TH CPUID 1 "23 Aug 2006" "20060823"
+.TH CPUID 1 "17 Sep 2006" "20060917"
 .SH NAME 
 cpuid \- Dump CPUID information for each CPU
 .SH SYNOPSIS
@@ -72,18 +72,29 @@ Display information only for the first CPU.  This cuts down on the output on
 a multiprocessor system, and is useful when certain that all CPUs are
 identical.
 .TP 8
-.I -i, --inst
-Use the CPUID instruction directly instead of the CPUID kernel module.  Often
-this works around erroneous information from the CPUID module, but it works
-on only the current CPU.  This should be OK on uniprocessors or homogeneous
-multiprocessors.  You don't need to be root if you use this option.
-.TP 8
 .I -f \fIFILE\fR, --file=\fIFILE\fR
 Read raw hex information from FILE instead of from executions of the cpuid 
 instruction.
 .TP 8
+.I -h, -H, --help
+Display help information.
+.TP 8
+.I -i, --inst
+Use the CPUID instruction.  The information it provides is reliable, but it 
+works on only the current CPU.  This should be OK on single-chip systems or
+homogeneous multi-chip systems.  It is not necessary to be root to use this
+option.  (This option is the default.)
+.TP 8
+.I -k, --kernel
+Use the CPUID kernel module.  This displays information for all CPUs, but the 
+information it provides is not reliable for all combinations of CPU type and
+kernel version.  Typically, it is necessary to be root to use this option.
+.TP 8
 .I -r, --raw
 Display only raw hex information with no decoding.
+.TP 8
+.I -v, --version
+Display cpuid version.
 .SH LIMITATIONS
 There is no known way to distinguish between some versions of the following
 CPUs:
@@ -203,6 +214,8 @@ Specification Update
 Processor E6000 Sequence Specification Update
 .br
 313356: Dual-Core Intel Xeon Processor 5100 Series Specification Update
+.br
+314554: Dual-Core Intel Xeon Processor 7100 Series Specification Update
 .RE
 
 Information on the CPUID instruction and on specific CPUs is available from

@@ -1,10 +1,34 @@
+Sun Sep 17 2006 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+	* cpuid.c: Made the cpuid instruction (-i, --inst options) the default.
+	* cpuid.c: Added -k, --kernel option to cause the kernel module to be
+	   used.
+	* cpuid.c: Removed confusing CPU number from output when using
+	  the cpuid instruction.
+	* cpuid.man: Updated with new options.
+	* cpuid.c, Makefile: Changed i386 _llseek kludge to workaround 
+	  offsets >= 0x80000000.  Now using -D_FILE_OFFSET_BITS=64 in the
+	  Makefile instead.  This should allow the i386 cpuid to work on
+	  an x86_64 system.
+	* cpuid.c: Added knowledge of CPU modules to synthesized field: Tulsa, 
+	  Woodcrest B1 (pre-production)
+	* cpuid.c: In synthesized model field, properly distinguish between 
+	  Intel Pentium D Processor 8x0 and Intel Pentium Extreme Edition 
+	  Processor 840 (both Smithfields).
+	* cpuid.man: Added mention of new 7100 series spec updates.
+	* cpuid.spec: Changed Copyright to License.
+
+Thu Aug 23 2006 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Removed unnecessary one_cpu argument from do_file.
+	* cpuid.c: Added -v option to display version number.
+
 Wed Aug 23 2006 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 
 Tue Aug 22 2006 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c, cpuid.man: Added -i option to use the CPUID instruction 
 	  directly instead of the CPUID kernel module.
-	* cpuid.c: Generate Pentium Processor 9x0 to 9xx because of 9x5 
+	* cpuid.c: Change Pentium Processor 9x0 to 9xx because of 9x5 
 	  processors.
 	* cpuid.man: Updated information about determining synthesized model 
 	  information, and added information about determining synthesized

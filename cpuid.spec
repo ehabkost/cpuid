@@ -1,10 +1,10 @@
-%define version 20060823
+%define version 20060917
 %define release 1
 Summary: dumps CPUID information about the CPU(s)
 Name: cpuid
 Version: %{version}
 Release: %{release}
-Copyright: BSD
+License: BSD
 Group: System Environment/Base
 Source: cpuid-%{version}.src.tar.gz
 Packager: Todd Allen <cpuid@etallen.com>

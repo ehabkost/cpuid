@@ -27,21 +27,6 @@
 #define _GNU_SOURCE
 #include <getopt.h>
 
-#if defined(i386)
-#include <linux/unistd.h>
-int _llseek(unsigned int   fd, 
-            unsigned long  offset_high, 
-            unsigned long  offset_low, 
-            loff_t*        result, 
-            unsigned int   whence);
-_syscall5(int,     _llseek, 
-          uint,    fd, 
-          ulong,   hi, 
-          ulong,   lo, 
-          loff_t*, res, 
-          uint,    wh);
-#endif
-
 typedef int   boolean;
 #define TRUE  1
 #define FALSE 0
@@ -50,6 +35,9 @@ typedef char*              string;
 typedef const char*        cstring;
 typedef const char* const  ccstring;
 #define SAME  0
+
+#define STR(x)   #x
+#define XSTR(x)  STR(x)
 
 #define MAX(l,r)            ((l) > (r) ? (l) : (r))
 
@@ -248,7 +236,7 @@ typedef enum {
    dC, /*        Celeron                                                      */
    MC, /* Mobile Celeron                                                      */
    nC, /* not    Celeron                                                      */
-   dc, /*        Core Solo                                                    */
+   dc, /*        CPU (often Core Solo)                                        */
    Dc, /*        Core Duo                                                     */
    Da, /*        Core Duo (Allendale)                                         */
    dO, /*                                      Opteron                        */
@@ -262,8 +250,8 @@ typedef enum {
    sA, /*                                      Athlon MP                      */
    MA, /*                            mobile    Athlon(64)                     */
    dF, /*                                      Athlon 64 FX                   */
-   dD, /*                                      Duron                          */
-   sD, /*        Pentium D                     Duron MP                       */
+   dD, /*        Pentium D                     Duron                          */
+   sD, /*                                      Duron MP                       */
    MD, /*                            mobile    Duron                          */
    dS, /*                                      Sempron                        */
    MS, /*                            mobile    Sempron                        */
@@ -288,8 +276,8 @@ typedef struct {
    unsigned int   val_80000001_ecx;
    unsigned int   val_80000008_ecx;
    unsigned int   transmeta_proc_rev;
-   unsigned char  brand[48];
-   unsigned char  transmeta_info[48];
+   char           brand[48];
+   char           transmeta_info[48];
 
    struct mp {
       boolean        ok;
@@ -584,7 +572,10 @@ specialize_intel_mp(code_t               result,
    if (stash->vendor == VENDOR_INTEL) {
       switch (result) {
       case dc:
-         if (stash->mp.cores == 2) {
+         if (stash->mp.cores == 4) {
+            // This can happen for pre-production Woodcrest cores
+            result = sX;
+         } else if (stash->mp.cores == 2) {
             result = Dc;
          }
          break;
@@ -984,6 +975,7 @@ print_synth_intel(const char*   name,
    */
    FMSC (   6, 15,  5, Dc, "Intel Core 2 Duo (Conroe B1) / Core 2 Extreme Processor (Conroe B1)");
    FMSC (   6, 15,  5, Da, "Intel Core 2 Duo (Allendale B1)");
+   FMSC (   6, 15,  5, sX, "Intel Dual-Core Xeon Processor 5100 (Woodcrest B1) (pre-production), 65nm");
    FMS  (   6, 15,  5,     "Intel Core 2 Duo (Conroe/Allendale B1) / Core 2 Extreme Processor (Conroe B1)");
    /*
    ** How to distinguish?
@@ -992,7 +984,6 @@ print_synth_intel(const char*   name,
    */
    FMSC (   6, 15,  6, Dc, "Intel Core 2 Duo (Conroe B2) / Core 2 Extreme Processor (Conroe B2)");
    FMSC (   6, 15,  6, Da, "Intel Core 2 Duo (Allendale B2)");
-   FMSC (   6, 15,  6, sX, "Intel Dual-Core Xeon Processor 5100 (Woodcrest B2), 65nm");
    FMS  (   6, 15,  6,     "Intel Core 2 Duo (Conroe/Allendale B2) / Core 2 Extreme Processor (Conroe B2) / Dual-Core Xeon Processor 5100 (Woodcrest B2), 65nm");
    FMC  (   6, 15,     Dc, "Intel Core 2 Duo (Conroe) / Core 2 Extreme Processor (Conroe)");
    FMC  (   6, 15,     Da, "Intel Core 2 Duo (Allendale)");
@@ -1071,12 +1062,11 @@ print_synth_intel(const char*   name,
    XFMSC(   0,  4,  3, sX, "Intel Xeon (Nocona N0), 90nm");
    XFMSC(   0,  4,  3, sI, "Intel Xeon (Irwindale N0), 90nm");
    XFMS (   0,  4,  3,     "Intel Pentium 4 (Prescott N0) / Xeon (Nocona N0 / Irwindale N0), 90nm");
-   /*
-   ** How to distinguish?
-   **    Pentium D Processor 8x1 (Smithfield)
-   **    Pentium Extreme Edition 840 (Smithfield)
-   */
+   XFMSC(   0,  4,  4, dD, "Intel Pentium D Processor 8x0 (Smithfield A0), 90nm");
+   XFMSC(   0,  4,  4, dc, "Intel Pentium Extreme Edition Processor 840 (Smithfield A0), 90nm");
    XFMS (   0,  4,  4,     "Intel Pentium D Processor 8x0 (Smithfield A0) / Pentium Extreme Edition Processor 840 (Smithfield A0), 90nm");
+   XFMSC(   0,  4,  7, dD, "Intel Pentium D Processor 8x0 (Smithfield B0), 90nm");
+   XFMSC(   0,  4,  7, dc, "Pentium Extreme Edition Processor 840 (Smithfield B0), 90nm");
    XFMS (   0,  4,  7,     "Intel Pentium D Processor 8x0 (Smithfield B0) / Pentium Extreme Edition Processor 840 (Smithfield B0), 90nm");
    XFMSC(   0,  4,  8, sX, "Intel Dual-Core Xeon (Paxville A0), 90nm");
    XFMSC(   0,  4,  8, s7, "Intel Dual-Core Xeon Processor 7000 (Paxville A0), 90nm");
@@ -1110,11 +1100,12 @@ print_synth_intel(const char*   name,
    XFMSC(   0,  6,  4, dC, "Intel Celeron D Processor 3xx (Cedar Mill C1), 65nm");
    XFMSC(   0,  6,  4, sX, "Intel Xeon Processor 5000 (Dempsey C1), 65nm");
    XFMS (   0,  6,  4,     "Intel Pentium 4 Processor 6x1 (Cedar Mill C1) / Pentium Extreme Edition Processor 955 (Presler C1) / Intel Pentium D Processor 9xx (Presler C1), 65nm / Intel Xeon Processor 5000 (Dempsey C1) / Celeron D Processor 3xx (Cedar Mill C1), 65nm");
+   XFMS (   0,  6,  8,     "Intel Xeon Processor 71x0 (Tulsa B0), 65nm");
    XFMC (   0,  6,     dD, "Intel Pentium D Processor 9xx (Presler), 65nm");
    XFMC (   0,  6,     dP, "Intel Pentium 4 Processor 6x1 (Cedar Mill) / Pentium Extreme Edition Processor 955 (Presler)");
    XFMC (   0,  6,     dC, "Intel Celeron D Processor 3xx (Cedar Mill), 65nm");
-   XFMC (   0,  6,     sX, "Intel Xeon Processor 5000 (Dempsey), 65nm");
-   XFM  (   0,  6,         "Intel Pentium 4 Processor 6x1 (Cedar Mill) / Pentium Extreme Edition Processor 955 (Presler) / Pentium D Processor 900 (Presler) / Intel Xeon Processor 5000 (Dempsey) / Celeron D Processor 3xx (Cedar Mill), 65nm");
+   XFMC (   0,  6,     sX, "Intel Xeon Processor 5000 (Dempsey) / Xeon Processor 71x0 (Tulsa), 65nm");
+   XFM  (   0,  6,         "Intel Pentium 4 Processor 6x1 (Cedar Mill) / Pentium Extreme Edition Processor 955 (Presler) / Pentium D Processor 900 (Presler) / Intel Xeon Processor 5000 (Dempsey) / Xeon Processor 71x0 (Tulsa) / Celeron D Processor 3xx (Cedar Mill), 65nm");
    XFC  (   0,         dP, "Intel Pentium 4 (unknown model)");
    XFC  (   0,         sX, "Intel Xeon (unknown model)");
    XFC  (   0,         sM, "Intel Xeon MP (unknown model)");
@@ -3139,25 +3130,34 @@ usage(void)
    printf("\n");
    printf("options:\n");
    printf("\n");
-   printf("   -h, -H,  --help       display this help information\n");
    printf("   -1,      --one-cpu    display information only for the first"
-                                    " CPU\n");
-   printf("   -i,      --inst       use the CPUID instruction directly instead"
-                                    " of the CPUID\n");
-   printf("                         kernel module: Often this works around"
-                                    " erroneous\n");
-   printf("                         information from the CPUID module, but it"
-                                    " works on only\n");
-   printf("                         the current CPU.  This should be OK"
-                                    " on uniprocessors\n");
-   printf("                         or homogeneous multiprocessors.  Need not"
-                                    " be root.\n");
+                                    " CPU.\n");
+   printf("                         (Meaningful only with -k or --kernel.)\n");
    printf("   -f FILE, --file=FILE  read raw hex information (-r output) from"
                                     " FILE instead\n");
    printf("                         of from executions of the cpuid"
                                     " instruction\n");
+   printf("   -h, -H,  --help       display this help information\n");
+   printf("   -i,      --inst       use the CPUID instruction: The information"
+                                    " it provides\n");
+   printf("                         is reliable, but it works on only the"
+                                    " current CPU.\n");
+   printf("                         This should be OK on single-chip systems or"
+                                    " homogeneous\n");
+   printf("                         multi-chip systems.  It is not necessary to"
+                                    " be root.\n");
+   printf("                         (This option is the default.)\n");
+   printf("   -k,      --kernel     use the CPUID kernel module: This displays"
+                                    " information\n");
+   printf("                         for all CPUs, but the information it"
+                                    " provides is not\n");
+   printf("                         reliable for all combinations of CPU type"
+                                    " and kernel\n");
+   printf("                         version.  Typically, it is necessary to be"
+                                    " root.\n");
    printf("   -r,      --raw        display raw hex information with no"
                                     " decoding\n");
+   printf("   -v,      --version    display cpuid version\n");
    printf("\n");
    exit(1);
 }
@@ -3507,12 +3507,7 @@ static int real_get (int           cpuid_fd,
    } else {
       int  status;
 
-#if defined(i386)
-      loff_t  result;
-      status = _llseek(cpuid_fd, 0, reg, &result, SEEK_SET);
-#else
       status = lseek(cpuid_fd, reg, SEEK_SET);
-#endif
       if (status == -1) {
          if (quiet) {
             return FALSE;
@@ -3556,11 +3551,16 @@ do_real(boolean  one_cpu,
       unsigned int   reg;
 
       if (one_cpu && cpu > 0) break;
+      if (inst && cpu > 0)    break;
 
       cpuid_fd = real_setup(cpu, inst);
       if (cpuid_fd == -1) break;
 
-      printf("CPU %u:\n", cpu);
+      if (inst) {
+         printf("CPU:\n");
+      } else {
+         printf("CPU %u:\n", cpu);
+      }
 
       basic_max = 0;
       for (reg = 0; reg <= basic_max; reg++) {
@@ -3650,7 +3650,6 @@ do_real(boolean  one_cpu,
 
 static void
 do_file(ccstring  filename,
-        boolean   one_cpu,
         boolean   raw)
 {
    boolean       seen_cpu = FALSE;
@@ -3687,7 +3686,7 @@ do_file(ccstring  filename,
       len = strlen(buffer);
 
       status = sscanf(ptr, "CPU %u:\r", &cpu);
-      if (status == 1) {
+      if (status == 1 || strcmp(ptr, "CPU:\n") == SAME) {
          if (!raw && seen_cpu) {
             decode_mp_synth(&stash);
             print_mp_synth(&stash.mp);
@@ -3696,7 +3695,11 @@ do_file(ccstring  filename,
 
          seen_cpu = TRUE;
 
-         printf("CPU %u:\n", cpu);
+         if (status == 1) {
+            printf("CPU %u:\n", cpu);
+         } else {
+            printf("CPU:\n");
+         }
          try2 = 0;
          {
             static code_stash_t  empty_stash = NIL_STASH;
@@ -3743,20 +3746,24 @@ int
 main(int     argc,
      string  argv[])
 {
-   static ccstring             shortopts  = "+hH1irf:";
+   static ccstring             shortopts  = "+hH1ikrf:v";
    static const struct option  longopts[] = {
       { "help",    no_argument,       NULL, 'h'  },
       { "one-cpu", no_argument,       NULL, '1'  },
       { "inst",    no_argument,       NULL, 'i'  },
+      { "kernel",  no_argument,       NULL, 'k'  },
       { "raw",     no_argument,       NULL, 'r'  },
       { "file",    required_argument, NULL, 'f'  },
+      { "version", no_argument,       NULL, 'v'  },
       { NULL,      no_argument,       NULL, '\0' }
    };
 
    boolean  opt_one_cpu  = FALSE;
    boolean  opt_inst     = FALSE;
+   boolean  opt_kernel   = FALSE;
    boolean  opt_raw      = FALSE;
    cstring  opt_filename = NULL;
+   boolean  opt_version  = FALSE;
 
    program = strrchr(argv[0], '/');
    if (program == NULL) {
@@ -3782,14 +3789,19 @@ main(int     argc,
          opt_one_cpu = TRUE;
          break;
       case 'i':
-         opt_inst    = TRUE;
-         opt_one_cpu = TRUE;
+         opt_inst = TRUE;
+         break;
+      case 'k':
+         opt_kernel = TRUE;
          break;
       case 'r':
          opt_raw = TRUE;
          break;
       case 'f':
          opt_filename = optarg;
+         break;
+      case 'v':
+         opt_version = TRUE;
          break;
       case '?':
       default:
@@ -3811,10 +3823,24 @@ main(int     argc,
       /*NOTREACHED*/
    }
 
-   if (opt_filename != NULL) {
-      do_file(opt_filename, opt_one_cpu, opt_raw);
+   if (opt_inst && opt_kernel) {
+      fprintf(stderr,
+              "%s: -i/--inst and -k/--kernel are incompatible options\n", 
+              program);
+      exit(1);
+   }
+
+   // Default to -i.  So use inst unless -k is specified.
+   boolean  inst = !opt_kernel;
+
+   if (opt_version) {
+      printf("cpuid version %s\n", XSTR(VERSION));
    } else {
-      do_real(opt_one_cpu, opt_inst, opt_raw);
+      if (opt_filename != NULL) {
+         do_file(opt_filename, opt_raw);
+      } else {
+         do_real(opt_one_cpu, inst, opt_raw);
+      }
    }
 
    exit(0);

@@ -1,16 +1,18 @@
-2006 Q3 Merom (the mobile variant of a Conroe: T5x00, T7x00) [no docs yet]
+2006 Q3 Merom (a.k.a. Centrino Duo) 
+              (the mobile variant of a Conroe: T5x00, T7x00) [no docs yet]
 2006 Q3 Tulsa (71xx) (the Xeon MP variant of a Dempsey?)
-2006 Q4 Kentsfield (4-core desktop Conroe?) (or related to Millville?) 
+2006 Q4 Kentsfield (Quadro) (4-core desktop Conroe) (or related to Millville?) 
 2007 Q1 Allendale (Conroe with only 2Mb of L2: E4300)
 2007 Q1 Millville (an Allendale with c=1?)
 2007 Q1 Clovertown (4-core server Conroe?)
 2007 Q2 Stealy (mobile)
 2007 Q3 Caneland (4-core Xeon MP)
 ?       Whitefield (ch=2 c=4) (65nm then 45nm)
-?       Tigerton (server variant of Whitefield: ch=4 c=4)
+2007 H2 Tigerton (server variant of Whitefield: ch=4 c=4)
 ?       Dunnington (c=4) (45nm) (server)
 ?       Harpertown (c=8) (45nm) (related to Dunnington?)
 ?       Gainestown (c=4) (based on Nehalem?)
+2008 ?  Aliceton (Xeon MP successor to Tigerton)
 --------------------------------------------------------------------------------
 2006 Q2 Turion X2 [no rev guide yet]
 2006 Q2 F2: Windsor (Athlon 64 FX & 64 X2), 

@@ -1,4 +1,4 @@
-CFLAGS=-g -Wall -Wshadow -Wcast-align -Wredundant-decls -Wbad-function-cast -Wcast-qual -Wwrite-strings -Waggregate-return -Wstrict-prototypes -Wmissing-prototypes 
+CFLAGS=-g -Wall -Wshadow -Wcast-align -Wredundant-decls -Wbad-function-cast -Wcast-qual -Wwrite-strings -Waggregate-return -Wstrict-prototypes -Wmissing-prototypes -D_FILE_OFFSET_BITS=64 -DVERSION=$(VERSION)
 
 PACKAGE=cpuid
 VERSION=$(shell date +%Y%m%d)
@@ -28,6 +28,9 @@ BUILDROOT=
 
 default: $(PROG) $(PROG).man.gz
 
+$(PROG): cpuid.c Makefile
+	$(CC) $(CFLAGS) -o $@ cpuid.c
+
 $(PROG).man.gz: $(PROG).man
 	gzip < $< > $@
 
@@ -44,7 +47,7 @@ clean:
 
 # Todd's Development rules
 
-$(PROG).x86_64: cpuid.c
+$(PROG).x86_64: cpuid.c Makefile
 	scp -p cpuid.c $(DEV_X86_64_HOST):/tmp
 	ssh $(DEV_X86_64_HOST) $(CC) $(CFLAGS) -o /tmp/$(PROG) /tmp/cpuid.c
 	scp -p $(DEV_X86_64_HOST):/tmp/$(PROG) $@
