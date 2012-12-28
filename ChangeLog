@@ -1,3 +1,6 @@
+Sat Mar  5 2011 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+
 Fri Mar  4 2011 Todd Allen <todd.allen@etallen.com>
 	* cpuid.c,cpuid.man: Added Celeron T1000 series, previously missing.
 	* cpuid.c,cpuid.man: Added Celeron Mobile P4000, U3000 series.

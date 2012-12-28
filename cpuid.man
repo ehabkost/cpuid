@@ -1,7 +1,7 @@
 .\"
-.\" $Id: cpuid.man,v 20101002 2010/10/02 07:11:00 todd $
+.\" $Id: cpuid.man,v 20110305 2011/03/05 05:36:00 todd $
 .\"
-.TH CPUID 1 "2 Oct 2010" "20101002"
+.TH CPUID 1 "5 Mar 2011" "20110305"
 .SH NAME 
 cpuid \- Dump CPUID information for each CPU
 .SH SYNOPSIS
