@@ -1,3 +1,15 @@
+Web Feb  8 2006 Todd Allen <todd.allen@etallen.com>
+
+	* cpuid.c: Use defined(i386) instead of __LONG_MAX__ to determine
+	  whether or not it's necessary to use _llseek().  Fixes handling of 
+	  functions >= 2**31 on some build systems, like the one I used to 
+	  build the binary rpm.  (D'oh!)  And also indirectly affects the
+	  (synth) field.
+	* cpuid.c: Fix a busted error check in read_reg() that caused it to
+	  return success if the read() failed and quiet was true.
+	* LICENSE: Created LICENSE file (using content straight out of the
+	  man page).
+
 Tue Feb  7 2006 Todd Allen <todd.allen@etallen.com>
 
 	* cpuid.c: Correctly distinguish Egypt/Italy processors.

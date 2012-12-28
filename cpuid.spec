@@ -1,4 +1,4 @@
-%define version 20060207
+%define version 20060208
 %define release 1
 Summary: dumps CPUID information about the CPU(s)
 Name: cpuid
@@ -28,4 +28,4 @@ rm -rf $RPM_BUILD_DIR/$RPM_PACKAGE_NAME-$RPM_PACKAGE_VERSION
 %files
 /usr/bin/cpuid
 /usr/share/man/man1/cpuid.1.gz
-%doc ChangeLog FUTURE
+%doc ChangeLog FUTURE LICENSE

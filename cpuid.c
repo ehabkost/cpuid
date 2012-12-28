@@ -27,7 +27,7 @@
 #define _GNU_SOURCE
 #include <getopt.h>
 
-#if __LONG_MAX__ == 2147483647L
+#if defined(i386)
 #include <linux/unistd.h>
 int _llseek(unsigned int   fd, 
             unsigned long  offset_high, 
@@ -2802,7 +2802,7 @@ static int read_reg (int           cpuid_fd,
 {
    int  status;
 
-#if __LONG_MAX__ == 2147483647L
+#if defined(i386)
    loff_t  result;
    status = _llseek(cpuid_fd, 0, reg, &result, SEEK_SET);
 #else
@@ -2821,7 +2821,7 @@ static int read_reg (int           cpuid_fd,
    }
 
    status = read(cpuid_fd, words, 16);
-   if (status == -1 && !quiet) {
+   if (status == -1) {
       if (quiet) {
          return FALSE;
       } else {

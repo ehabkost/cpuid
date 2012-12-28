@@ -16,7 +16,7 @@ DEBUG_RPM=$(PACKAGE)-debuginfo-$(VERSION)-$(RELEASE).$(ARCH).rpm
 SRCS=cpuid.c
 
 OTHER_SRCS=Makefile $(PROG).man $(PACKAGE).proto.spec $(PACKAGE).spec \
-           ChangeLog FUTURE
+           ChangeLog FUTURE LICENSE
 OTHER_BINS=$(PROG).man
 
 REL_DIR=../$(shell date +%Y-%m-%d)
