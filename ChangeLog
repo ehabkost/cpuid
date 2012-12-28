@@ -1,3 +1,44 @@
+Sat Feb 25 2012 Todd Allen <todd.allen@etallen.com>
+	* Made new release.
+	* cpuid.c: Cleaned up hypervisor-specific leaves for KVM.
+	* cpuid.man: Added mention of KVM cpuid documentation.
+
+Fri Feb 24 2012 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added synth decoding for Intel Westmere-EX processors.
+	* cpuid.c: Added synth decoding for AMD family 15h chips: AMD FX
+	  (Zambezi), Opteron 6200 (Interlagos), and Opteron 4200 (Valencia).
+	* cpuid.c: Added synth decoding for AMD Z-Series and other Fusion
+	  chip ON-C0 steppings.
+	* cpuid.c: Added synth decoding for Atom Z600 (Lincroft).
+	* cpuid.c: Updated AMD model decoding for family 10h processors.
+	* cpuid.man: Added mention of AMD family 14h and 15h documents, and
+	  Intel Westmere-EX & Lincroft documents.
+	* cpuid.man: Removed obsolete limitation about 0x8000001b.
+	* cpuid.c: Added support for hypervisor leaves (0x4000000 and after).
+	  Interpreted known generic leaves.  Interpreted hypervisor-specific
+	  leaves for Xen (deduced from source, as no documentation on them
+	  exists).  Interpreted hypervisor-specific leaves for KVM.  Interpreted
+	  hypervisor-specific leaves for Microsoft.
+
+Tue Jan  3 2012 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added synth decoding for Athlon 64 (Venice DH-E6) chips.
+
+Wed Nov  2 2011 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added saw_4 and saw_b stash flags to deal with chips that
+	  report 0xc codes but still omit 0xb codes.  This way, a maximum code
+	  of 0xc no longer implies the presence of 0xb codes for things like
+	  APIC decoding.
+
+Mon Mar 28 2011 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added APIC synth decoding for AMD, deduced by analogy to Intel
+	  code and the multiprocessor synth logic.
+
+Mon Mar  7 2011 Todd Allen <todd.allen@etallen.com>
+	* cpuid.c: Added some decoding for VIA 0xc0000002 codes, based on
+	  information from Juerg Haefliger.  Very incomplete because VIA
+	  doesn't document their functions well.
+	* cpuid.c: Fixed output of 0xc0000001 raw dump to conform to new style.
+
 Sat Mar  5 2011 Todd Allen <todd.allen@etallen.com>
 	* Made new release.
 

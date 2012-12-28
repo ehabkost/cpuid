@@ -1,11 +1,12 @@
-Intel: Xeon-E3/E4/E5 (Sandy Bridge server chip)
+Intel: Xeon-E5 (Sandy Bridge server chip)
 Intel: Pentium G20T (Sandy Bridge desktop chip)
+Intel: Pentium B900 Series (Sandy Bridge desktop chip)
+Intel: Celeron B700 / B800 Series (Sandy Bridge Celerons)
 Intel: Ivy Bridge (22nm die shrink of Sandy Bridge)
-Intel: Atom: Lincroft (Atom Z600)
+Intel: Atom: D2500/D2700/N2600/N2800 (Cedar Trail)
 AMD: Geneva (the Athlon II Neo counterpart of the Athlon II mobile Champlain, 
              or the V-Series Champlain?) 
             [not seen in any revision guides yet, though]
-AMD: Fusion: Bulldozer
 
 Untested:
    AMD: Fusion: Bobcat: Ontario/Zacate

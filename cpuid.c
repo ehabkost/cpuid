@@ -160,6 +160,14 @@ typedef enum {
    VENDOR_NSC
 } vendor_t;
 
+typedef enum {
+   HYPERVISOR_UNKNOWN,
+   HYPERVISOR_VMWARE,
+   HYPERVISOR_XEN,
+   HYPERVISOR_KVM,
+   HYPERVISOR_MICROSOFT,
+} hypervisor_t;
+
 #define __F(v)     ((v) & 0x0ff00f00)
 #define __M(v)     ((v) & 0x000f00f0)
 #define __FM(v)    ((v) & 0x0fff0ff0)
@@ -209,6 +217,8 @@ typedef enum {
 
 typedef struct {
    vendor_t       vendor;
+   boolean        saw_4;
+   boolean        saw_b;
    unsigned int   val_0_eax;
    unsigned int   val_1_eax;
    unsigned int   val_1_ebx;
@@ -225,6 +235,7 @@ typedef struct {
    char           brand[48];
    char           transmeta_info[48];
    char           override_brand[48];
+   hypervisor_t   hypervisor;
 
    struct mp {
       const char*    method;
@@ -297,10 +308,12 @@ typedef struct {
 } code_stash_t;
 
 #define NIL_STASH { VENDOR_UNKNOWN, \
+                    FALSE, FALSE, \
                     0, 0, 0, 0, 0, 0, \
                     { 0, 0 }, \
                     { 0, 0 }, \
-                    0, 0, 0, 0, 0, "", "", "",   \
+                    0, 0, 0, 0, 0, "", "", "", \
+                    HYPERVISOR_UNKNOWN, \
                     { NULL, -1, -1 }, \
                     { FALSE, \
                       { FALSE, FALSE, FALSE, FALSE, FALSE, \
@@ -817,6 +830,7 @@ decode_amd_model(const code_stash_t*  stash,
             case PG(0) + NC(5) + STR1(0): *brand_pre = "Six-Core AMD Opteron(tm)";  s1 = "Processor 84"; break;
             case PG(0) + NC(5) + STR1(1): *brand_pre = "Six-Core AMD Opteron(tm)";  s1 = "Processor 24"; break;
             case PG(1) + NC(3) + STR1(1): *brand_pre = "Embedded AMD Opteron(tm)";  s1 = "Processor ";   break;
+            case PG(1) + NC(5) + STR1(1): *brand_pre = "Embedded AMD Opteron(tm)";  s1 = "Processor ";   break;
             default:                                                                s1 = NULL;           break;
             }
             /* 41322 3.74: table 15: String2 Values for Fr2, Fr5, and Fr6 (1207) Processors */
@@ -834,6 +848,8 @@ decode_amd_model(const code_stash_t*  stash,
             case PG(1) + NC(3) + STR2(5):  s2 = "NP HE"; break;
             case PG(1) + NC(3) + STR2(6):  s2 = "KH HE"; break;
             case PG(1) + NC(3) + STR2(7):  s2 = "KS HE"; break;
+            case PG(1) + NC(5) + STR2(1):  s2 = "QS";    break;
+            case PG(1) + NC(5) + STR2(2):  s2 = "KS HE"; break;
             default:                       s2 = NULL;    break;
             }
             break;
@@ -866,8 +882,12 @@ decode_amd_model(const code_stash_t*  stash,
             case PG(0) + NC(3) + STR1(10): *brand_pre = "AMD Athlon(tm) II X4";      s1 = "6";            break;
             case PG(0) + NC(3) + STR1(15): *brand_pre = "AMD Athlon(tm) II X4";      s1 = "";             break;
             case PG(0) + NC(5) + STR1(0):  *brand_pre = "AMD Phenom(tm) II X6";      s1 = "1";            break;
+            case PG(1) + NC(1) + STR1(1):  *brand_pre = "AMD Athlon(tm) II XLT V";   s1 = "";             break;
+            case PG(1) + NC(1) + STR1(2):  *brand_pre = "AMD Athlon(tm) II XL V";    s1 = "";             break;
+            case PG(1) + NC(3) + STR1(1):  *brand_pre = "AMD Phenom(tm) II XLT Q";   s1 = "";             break;
             case PG(1) + NC(3) + STR1(2):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "9";            break;
             case PG(1) + NC(3) + STR1(3):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "8";            break;
+            case PG(1) + NC(3) + STR1(4):  *brand_pre = "AMD Phenom(tm) II X4";      s1 = "6";            break;
             default:                                                                 s1 = NULL;           break;
             }
             /* 41322 3.74: table 17: String2 Values for AM2r2 and AM3 Processors */
@@ -902,6 +922,9 @@ decode_amd_model(const code_stash_t*  stash,
             case PG(0) + NC(3) + STR2(14): s2 = "0 Processor";               break;
             case PG(0) + NC(5) + STR2(0):  s2 = "5T Processor";              break;
             case PG(0) + NC(5) + STR2(1):  s2 = "0T Processor";              break;
+            case PG(1) + NC(1) + STR2(1):  s2 = "L Processor";               break;
+            case PG(1) + NC(1) + STR2(2):  s2 = "C Processor";               break;
+            case PG(1) + NC(3) + STR2(1):  s2 = "L Processor";               break;
             case PG(1) + NC(3) + STR2(4):  s2 = "T Processor";               break;
             default:                       s2 = NULL;                        break;
             }
@@ -939,10 +962,11 @@ decode_amd_model(const code_stash_t*  stash,
          case 3:
             /* 41322 3.74: table 20: String1 Values for G34r1 Processors */
             switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(7)  + STR1(0): *brand_pre = "AMD Opteron(tm)"; s1 = "Processor 61"; break;
-            case PG(0) + NC(11) + STR1(0): *brand_pre = "AMD Opteron(tm)"; s1 = "Processor 61"; break;
+            case PG(0) + NC(7)  + STR1(0): *brand_pre = "AMD Opteron(tm)";          s1 = "Processor 61"; break;
+            case PG(0) + NC(11) + STR1(0): *brand_pre = "AMD Opteron(tm)";          s1 = "Processor 61"; break;
+            case PG(1) + NC(7)  + STR1(1): *brand_pre = "Embedded AMD Opteron(tm)"; s1 = "Processor ";   break;
             /* It sure is odd that there are no 0/7/1 or 0/11/1 cases here. */
-            default:                                                       s1 = NULL;           break;
+            default:                                                                s1 = NULL;           break;
             }
             /* 41322 3.74: table 21: String2 Values for G34r1 Processors */
             switch (PG(pg) + NC(nc) + STR2(str2)) {
@@ -950,6 +974,8 @@ decode_amd_model(const code_stash_t*  stash,
             case PG(0) + NC(7)  + STR1(1): s2 = " SE"; break;
             case PG(0) + NC(11) + STR1(0): s2 = " HE"; break;
             case PG(0) + NC(11) + STR1(1): s2 = " SE"; break;
+            case PG(1) + NC(7)  + STR1(1): s2 = "QS";  break;
+            case PG(1) + NC(7)  + STR1(2): s2 = "KS";  break;
             default:                       s2 = NULL;  break;
             }
             break;
@@ -978,19 +1004,26 @@ decode_amd_model(const code_stash_t*  stash,
          case 5:
             /* 41322 3.74: table 24: String1 Values for C32r1 Processors */
             switch (PG(pg) + NC(nc) + STR1(str1)) {
-            case PG(0) + NC(3) + STR1(0): *brand_pre = "AMD Opteron(tm)"; s1 = "41"; break;
-            case PG(0) + NC(5) + STR1(0): *brand_pre = "AMD Opteron(tm)"; s1 = "41"; break;
+            case PG(0) + NC(3) + STR1(0): *brand_pre = "AMD Opteron(tm)";          s1 = "41"; break;
+            case PG(0) + NC(5) + STR1(0): *brand_pre = "AMD Opteron(tm)";          s1 = "41"; break;
+            case PG(1) + NC(3) + STR1(1): *brand_pre = "Embedded AMD Opteron(tm)"; s1 = " ";  break;
+            case PG(1) + NC(5) + STR1(1): *brand_pre = "Embedded AMD Opteron(tm)"; s1 = " ";  break;
             /* It sure is odd that there are no 0/3/1 or 0/5/1 cases here. */
-            default:                                                      s1 = NULL; break;
+            default:                                                               s1 = NULL; break;
             }
             /* 41322 3.74: table 25: String2 Values for C32r1 Processors */
             /* 41322 3.74: table 25 */
             switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(3) + STR1(0): s2 = " HE"; break;
-            case PG(0) + NC(3) + STR1(1): s2 = " EE"; break;
-            case PG(0) + NC(5) + STR1(0): s2 = " HE"; break;
-            case PG(0) + NC(5) + STR1(1): s2 = " EE"; break;
-            default:                      s2 = NULL;  break;
+            case PG(0) + NC(3) + STR1(0): s2 = " HE";   break;
+            case PG(0) + NC(3) + STR1(1): s2 = " EE";   break;
+            case PG(0) + NC(5) + STR1(0): s2 = " HE";   break;
+            case PG(0) + NC(5) + STR1(1): s2 = " EE";   break;
+            case PG(1) + NC(3) + STR1(1): s2 = "QS HE"; break;
+            case PG(1) + NC(3) + STR1(2): s2 = "LE HE"; break;
+            case PG(1) + NC(3) + STR1(3): s2 = "CL EE"; break;
+            case PG(1) + NC(5) + STR1(1): s2 = "KX HE"; break;
+            case PG(1) + NC(5) + STR1(2): s2 = "GL EE"; break;
+            default:                      s2 = NULL;    break;
             }
             break;
          default:
@@ -1078,29 +1111,39 @@ decode_amd_model(const code_stash_t*  stash,
             case PG(0) + NC(0) + STR1(4): *brand_pre = "AMD"; s1 = "G-T"; break;
             case PG(0) + NC(1) + STR1(1): *brand_pre = "AMD"; s1 = "C-";  break;
             case PG(0) + NC(1) + STR1(2): *brand_pre = "AMD"; s1 = "E-";  break;
+            case PG(0) + NC(1) + STR1(3): *brand_pre = "AMD"; s1 = "Z-";  break;
             case PG(0) + NC(1) + STR1(4): *brand_pre = "AMD"; s1 = "G-T"; break;
             default:                                          s1 = NULL;  break;
             }
             /* 47534 3.00: table 5: String2 Values for FT1 Processors */
             switch (PG(pg) + NC(nc) + STR2(str2)) {
-            case PG(0) + NC(0) + STR2(1): s2 = "";   break;
-            case PG(0) + NC(0) + STR2(2): s2 = "0";  break;
-            case PG(0) + NC(0) + STR2(3): s2 = "5";  break;
-            case PG(0) + NC(0) + STR2(4): s2 = "0x"; break;
-            case PG(0) + NC(0) + STR2(5): s2 = "5x"; break;
-            case PG(0) + NC(0) + STR2(6): s2 = "x";  break;
-            case PG(0) + NC(0) + STR2(7): s2 = "L";  break;
-            case PG(0) + NC(0) + STR2(8): s2 = "N";  break;
-            case PG(0) + NC(0) + STR2(9): s2 = "R";  break;
-            case PG(0) + NC(1) + STR2(1): s2 = "";   break;
-            case PG(0) + NC(1) + STR2(2): s2 = "0";  break;
-            case PG(0) + NC(1) + STR2(3): s2 = "5";  break;
-            case PG(0) + NC(1) + STR2(4): s2 = "0x"; break;
-            case PG(0) + NC(1) + STR2(5): s2 = "5x"; break;
-            case PG(0) + NC(1) + STR2(6): s2 = "x";  break;
-            case PG(0) + NC(1) + STR2(7): s2 = "L";  break;
-            case PG(0) + NC(1) + STR2(8): s2 = "N";  break;
-            default:                      s2 = NULL; break;
+            case PG(0) + NC(0) + STR2(1):  s2 = "";   break;
+            case PG(0) + NC(0) + STR2(2):  s2 = "0";  break;
+            case PG(0) + NC(0) + STR2(3):  s2 = "5";  break;
+            case PG(0) + NC(0) + STR2(4):  s2 = "0x"; break;
+            case PG(0) + NC(0) + STR2(5):  s2 = "5x"; break;
+            case PG(0) + NC(0) + STR2(6):  s2 = "x";  break;
+            case PG(0) + NC(0) + STR2(7):  s2 = "L";  break;
+            case PG(0) + NC(0) + STR2(8):  s2 = "N";  break;
+            case PG(0) + NC(0) + STR2(9):  s2 = "R";  break;
+            case PG(0) + NC(0) + STR2(10): s2 = "0";  break;
+            case PG(0) + NC(0) + STR2(11): s2 = "5";  break;
+            case PG(0) + NC(0) + STR2(12): s2 = "";   break;
+            case PG(0) + NC(0) + STR2(13): s2 = "0D"; break;
+            case PG(0) + NC(1) + STR2(1):  s2 = "";   break;
+            case PG(0) + NC(1) + STR2(2):  s2 = "0";  break;
+            case PG(0) + NC(1) + STR2(3):  s2 = "5";  break;
+            case PG(0) + NC(1) + STR2(4):  s2 = "0x"; break;
+            case PG(0) + NC(1) + STR2(5):  s2 = "5x"; break;
+            case PG(0) + NC(1) + STR2(6):  s2 = "x";  break;
+            case PG(0) + NC(1) + STR2(7):  s2 = "L";  break;
+            case PG(0) + NC(1) + STR2(8):  s2 = "N";  break;
+            case PG(0) + NC(1) + STR2(9):  s2 = "0";  break;
+            case PG(0) + NC(1) + STR2(10): s2 = "5";  break;
+            case PG(0) + NC(1) + STR2(11): s2 = "";   break;
+            case PG(0) + NC(1) + STR2(12): s2 = "E";  break;
+            case PG(0) + NC(1) + STR2(13): s2 = "0D"; break;
+            default:                       s2 = NULL; break;
             }
             break;
          break;
@@ -1980,7 +2023,7 @@ print_synth_intel(const char*          name,
    FMS (    0, 6,  2, 5,  2,     "Intel Core i3 / i5 / i7 (Clarkdale C2) / Core i3 Mobile / Core i5 Mobile / Core i7 Mobile (Arrandale C2) / Pentium P6000 Mobile (Arrandale C2) / Celeron Mobile P4500 (Arrandale C2) / Xeon Processor L3406 (Clarkdale C2), 32nm");
    FMSQ(    0, 6,  2, 5,  5, MC, "Intel Celeron Celeron Mobile U3400 (Arrandale K0) / Celeron Mobile P4600 (Arrandale K0), 32nm");
    FMSQ(    0, 6,  2, 5,  5, MP, "Intel Pentium U5000 Mobile (Arrandale K0), 32nm");
-   FMSQ(    0, 6,  2, 5,  2, dP, "Intel Pentium P4505 / U3405 (Clarkdale K0), 32nm");
+   FMSQ(    0, 6,  2, 5,  5, dP, "Intel Pentium P4505 / U3405 (Clarkdale K0), 32nm");
    FMSQ(    0, 6,  2, 5,  5, dc, "Intel Core i3-300 / i3-500 / i5-400 / i5-500 / i5-600 / i7-600 (Clarkdale K0), 32nm");
    FMS (    0, 6,  2, 5,  5,     "Intel Core i3 / i5 / i7  (Clarkdale K0) / Pentium U5000 Mobile / Pentium P4505 / U3405 / Celeron Mobile P4000 / U3000 (Arrandale K0), 32nm");
    FMQ (    0, 6,  2, 5,     sX, "Intel Xeon Processor L3406 (Clarkdale), 32nm");
@@ -1990,10 +2033,13 @@ print_synth_intel(const char*          name,
    FMQ (    0, 6,  2, 5,     Mc, "Intel Core Mobile (Arrandale), 32nm");
    FMQ (    0, 6,  2, 5,     dc, "Intel Core (Clarkdale), 32nm");
    FM  (    0, 6,  2, 5,         "Intel Core (Clarkdale) / Core (Arrandale) / Pentium (Clarkdale) / Pentium Mobile (Arrandale) / Celeron Mobile (Arrandale) / Xeon (Clarkdale), 32nm");
+   FMS (    0, 6,  2, 6,  1,     "Intel Atom (Lincroft C0), 45nm");
+   FM  (    0, 6,  2, 6,         "Intel Atom (Lincroft), 45nm");
    FMSQ(    0, 6,  2,10,  7, Xc, "Intel Mobile Core i7 Extreme (Sandy Bridge D2), 32nm");
    FMSQ(    0, 6,  2,10,  7, Mc, "Intel Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
    FMSQ(    0, 6,  2,10,  7, dc, "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 (Sandy Bridge D2), 32nm");
-   FMS (    0, 6,  2,10,  7,     "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
+   FMSQ(    0, 6,  2,10,  7, sX, "Intel Xeon E3-1200 (Sandy Bridge D2), 32nm");
+   FMS (    0, 6,  2,10,  7,     "Intel Core i3-2000 / Core i5-2000 / Core i7-2000 / Mobile Core i7-2000 (Sandy Bridge D2) / Xeon E3-1200 (Sandy Bridge D2), 32nm");
    FMQ (    0, 6,  2,10,     Xc, "Intel Mobile Core i7 Extreme (Sandy Bridge D2), 32nm");
    FMQ (    0, 6,  2,10,     Mc, "Intel Mobile Core i3-2000 / Mobile Core i5-2000 / Mobile Core i7-2000 (Sandy Bridge D2), 32nm");
    FMQ (    0, 6,  2,10,     dc, "Intel Core i5-2000 / Core i7-2000 (Sandy Bridge D2), 32nm");
@@ -2004,6 +2050,8 @@ print_synth_intel(const char*          name,
    FM  (    0, 6,  2,12,         "Intel Core (Gulftown) / Xeon (Westmere-EP), 32nm");
    FMS (    0, 6,  2,14,  6,     "Intel Xeon Processor 7500 (Beckton D0), 45nm");
    FM  (    0, 6,  2,14,         "Intel Xeon (Beckton), 45nm");
+   FMS (    0, 6,  2,15,  2,     "Intel Xeon E7-8800 / Xeon E7-4800 / Xeon E7-2800 (Westmere-EX A2), 32nm");
+   FM  (    0, 6,  2,15,         "Intel Xeon E7-8800 / Xeon E7-4800 / Xeon E7-2800 (Westmere-EX), 32nm");
    FQ  (    0, 6,            sX, "Intel Xeon (unknown model)");
    FQ  (    0, 6,            se, "Intel Xeon (unknown model)");
    FQ  (    0, 6,            MC, "Intel Mobile Celeron (unknown model)");
@@ -2437,10 +2485,12 @@ print_synth_amd(const char*          name,
    FMS (0,15,  2,12,  0,     "AMD Sempron (Palermo DH-E3), 754-pin, 90nm");
    FMSQ(0,15,  2,12,  2, MS, "AMD mobile Sempron (Albany/Roma DH-E6), 754-pin, 90nm");
    FMSQ(0,15,  2,12,  2, dS, "AMD Sempron (Palermo DH-E6), 754-pin, 90nm");
-   FMS (0,15,  2,12,  2,     "AMD Sempron (Palermo DH-E6) / mobile Sempron (Albany/Roma DH-E6), 754-pin, 90nm");
+   FMSQ(0,15,  2,12,  2, dA, "AMD Athlon 64 (Venice DH-E6), 754-pin, 90nm");
+   FMS (0,15,  2,12,  2,     "AMD Athlon 64 (Venice DH-E6) / Sempron (Palermo DH-E6) / mobile Sempron (Albany/Roma DH-E6), 754-pin, 90nm");
    FMQ (0,15,  2,12,     MS, "AMD mobile Sempron (Albany/Roma DH), 754-pin, 90nm");
    FMQ (0,15,  2,12,     dS, "AMD Sempron (Palermo DH), 754-pin, 90nm");
-   FM  (0,15,  2,12,         "AMD Sempron (Palermo DH) / mobile Sempron (Albany/Roma DH), 754-pin, 90nm");
+   FMQ (0,15,  2,12,     dA, "AMD Athlon 64 (Venice DH), 754-pin, 90nm");
+   FM  (0,15,  2,12,         "AMD Athlon 64 (Venice DH) / Sempron (Palermo DH) / mobile Sempron (Albany/Roma DH), 754-pin, 90nm");
    FMSQ(0,15,  2,15,  0, dS, "AMD Sempron (Palermo DH-E3), 939-pin, 90nm");
    FMSQ(0,15,  2,15,  0, dA, "AMD Athlon 64 (Venice DH-E3), 939-pin, 90nm");
    FMS (0,15,  2,15,  0,     "AMD Athlon 64 (Venice DH-E3) / Sempron (Palermo DH-E3), 939-pin, 90nm");
@@ -2685,9 +2735,17 @@ print_synth_amd(const char*          name,
    FMQ (2,15,  0, 3,     dA, "AMD Athlon (Lion), 65nm");
    FM  (2,15,  0, 3,         "AMD Turion X2 (Lion) / Athlon (Lion) / Sempron (Sable), 65nm");
    F   (2,15,                "AMD Turion X2 Mobile / Athlon / Athlon X2 / Sempron / Sempron X2, 65nm");
-   FMS (5,15,  0, 1,  0,     "AMD C-Series (Ontario B0) / E-Series (Zacate B0) / G-Series (Ontario/Zacat B0), 40nm");
-   FM  (5,15,  0, 1,         "AMD C-Series (Ontario) / E-Series (Zacate) / G-Series (Ontario/Zacat), 40nm");
-   F   (5,15,                "AMD C-Series / E-Series / G-Series, 40nm");
+   FMS (5,15,  0, 2,  0,     "AMD C-Series (Ontario ON-C0) / E-Series (Zacate ON-C0) / G-Series (Ontario/Zacat ON-C0) / Z-Series (Desna ON-C0), 40nm");
+   FM  (5,15,  0, 2,         "AMD C-Series (Ontario) / E-Series (Zacate) / G-Series (Ontario/Zacat) / Z-Series (Desna), 40nm");
+   FMS (5,15,  0, 1,  0,     "AMD C-Series (Ontario ON-B0) / E-Series (Zacate ON-B0) / G-Series (Ontario/Zacat ON-B0) / Z-Series (Desna ON-B0), 40nm");
+   FM  (5,15,  0, 1,         "AMD C-Series (Ontario) / E-Series (Zacate) / G-Series (Ontario/Zacat) / Z-Series (Desna), 40nm");
+   F   (5,15,                "AMD C-Series / E-Series / G-Series / Z-Series, 40nm");
+   FMSQ(6,15,  0, 1,  2, dO, "AMD Opteron 6200 (Interlagos OR-B2) / Opteron 4200 (Valencia OR-B2)");
+   FMS (6,15,  0, 1,  2,     "AMD Opteron 6200 (Interlagos OR-B2) / Opteron 4200 (Valencia OR-B2) / AMD FX-Series (Zambezi OR-B2)");
+   FMQ (6,15,  0, 1,     dO, "AMD Opteron 6200 (Interlagos) / Opteron 4200 (Valencia)");
+   FM  (6,15,  0, 1,         "AMD Opteron 6200 (Interlagos) / Opteron 4200 (Valencia) / AMD FX-Series (Zambezi)");
+   F   (6,15,                "AMD Opteron 6200 / Opteron 4200 / AMD FX-Series");
+   F   (6,15,                "AMD Opteron 6200 / Opteron 4200 / AMD FX-Series");
    DEFAULT                  ("unknown");
 
    const char*  brand_pre;
@@ -3019,7 +3077,7 @@ static void decode_mp_synth(code_stash_t*  stash)
       ** and:
       **    Intel 64 Architecture Processor Topology Enumeration (Whitepaper)
       */
-      if (stash->val_0_eax >= 0xb) {
+      if (stash->saw_b) {
          unsigned int  ht = GET_X2APIC_PROCESSORS(stash->val_b_ebx[0]);
          unsigned int  tc = GET_X2APIC_PROCESSORS(stash->val_b_ebx[1]);
          stash->mp.method = "Intel leaf 0xb";
@@ -3028,7 +3086,7 @@ static void decode_mp_synth(code_stash_t*  stash)
          }
          stash->mp.cores        = tc / ht;
          stash->mp.hyperthreads = ht;
-      } else if (stash->val_0_eax >= 4) {
+      } else if (stash->saw_4) {
          unsigned int  tc = GET_LogicalProcessorCount(stash->val_1_ebx);
          unsigned int  c;
          if ((stash->val_4_eax & 0x1f) != 0) {
@@ -3161,23 +3219,42 @@ static int bits_needed(unsigned long  v)
 
 static void print_apic_synth (code_stash_t*  stash)
 {
-   /*
-   ** Logic derived from information in:
-   **    Detecting Multi-Core Processor Topology in an IA-32 Platform
-   **    by Khang Nguyen and Shihjong Kuo
-   ** and:
-   **    Intel 64 Architecture Processor Topology Enumeration (Whitepaper)
-   */
    unsigned int  smt_width;
    unsigned int  core_width;
 
    switch (stash->vendor) {
    case VENDOR_INTEL:
-      if (stash->val_0_eax >= 0xb) {
+      /*
+      ** Logic derived from information in:
+      **    Detecting Multi-Core Processor Topology in an IA-32 Platform
+      **    by Khang Nguyen and Shihjong Kuo
+      ** and:
+      **    Intel 64 Architecture Processor Topology Enumeration (Whitepaper)
+      */
+      if (stash->saw_b) {
          smt_width  = GET_X2APIC_WIDTH(stash->val_b_eax[0]);
          core_width = GET_X2APIC_WIDTH(stash->val_b_eax[1]);
-      } else if (stash->val_0_eax >= 4 && (stash->val_4_eax & 0x1f) != 0) {
+      } else if (stash->saw_4 && (stash->val_4_eax & 0x1f) != 0) {
          unsigned int  core_count = GET_NC_INTEL(stash->val_4_eax) + 1;
+         unsigned int  smt_count  = (GET_LogicalProcessorCount(stash->val_1_ebx)
+                                     / core_count);
+         smt_width   = bits_needed(smt_count);
+         core_width  = bits_needed(core_count);
+      } else {
+         return;
+      }
+      break;
+   case VENDOR_AMD:
+      /*
+      ** Logic deduced by analogy: As Intel's decode_mp_synth code is to AMD's
+      ** decode_mp_synth code, so is Intel's APIC synth code to this.
+      */
+      if (IS_HTT(stash->val_1_edx)
+          && GET_ApicIdCoreIdSize(stash->val_80000008_ecx) != 0) {
+         unsigned int  size = GET_ApicIdCoreIdSize(stash->val_80000008_ecx);
+         unsigned int  mask = (1 << size) - 1;
+         unsigned int  core_count = ((GET_NC_AMD(stash->val_80000008_ecx) & mask)
+                                     + 1);
          unsigned int  smt_count  = (GET_LogicalProcessorCount(stash->val_1_ebx)
                                      / core_count);
          smt_width   = bits_needed(smt_count);
@@ -3809,6 +3886,150 @@ print_b_ecx(unsigned int  value)
 
    print_names(value, names, LENGTH(names, named_item),
                /* max_len => */ 33);
+}
+
+static void
+print_40000002_ecx_xen(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "MMU_PT_UPDATE_PRESERVE_AD supported"     ,  0,  0, bools },
+        };
+
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_40000001_eax_kvm(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "kvmclock available at MSR 0x11"          ,  0,  0, bools },
+          { "delays unnecessary for PIO ops"          ,  1,  1, bools },
+          { "mmu_op"                                  ,  2,  2, bools },
+          { "kvmclock available a MSR 0x4b564d00"     ,  3,  3, bools },
+          { "async pf enable available by MSR"        ,  4,  4, bools },
+          { "no guest per-cpu warps expected warning" , 24, 24, bools },
+        };
+
+   printf("   hypervisor features (0x40000001/eax):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_40000003_eax_xen(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "vtsc"                                    ,  0,  0, bools },
+          { "host tsc is safe"                        ,  1,  1, bools },
+          { "boot cpu has RDTSCP"                     ,  2,  2, bools },
+        };
+
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_40000003_eax_microsoft(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "VP run time"                             ,  0,  0, bools },
+          { "partition reference counter"             ,  1,  1, bools },
+          { "basic synIC MSRs"                        ,  2,  2, bools },
+          { "synthetic timer MSRs"                    ,  3,  3, bools },
+          { "APIC access MSRs"                        ,  4,  4, bools },
+          { "hypercall MSRs"                          ,  5,  5, bools },
+          { "access virtual process index MSR"        ,  6,  6, bools },
+          { "virtual system reset MSR"                ,  7,  7, bools },
+        };
+
+   printf("   hypervisor feature identification (0x40000003/eax):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_40000003_ebx_microsoft(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "CreatePartitions"                        ,  0,  0, bools },
+          { "AccessPartitionId"                       ,  1,  1, bools },
+          { "AccessMemoryPool"                        ,  2,  2, bools },
+          { "AdjustMessageBuffers"                    ,  3,  3, bools },
+          { "PostMessages"                            ,  4,  4, bools },
+          { "SignalEvents"                            ,  5,  5, bools },
+          { "CreatePort"                              ,  6,  6, bools },
+          { "ConnectPort"                             ,  7,  7, bools },
+          { "AccessStats"                             ,  8,  8, bools },
+          { "Debugging"                               , 11, 11, bools },
+          { "CPUManagement"                           , 12, 12, bools },
+          { "ConfigureProfiler"                       , 13, 13, bools },
+        };
+
+   printf("   hypervisor partition creation flags (0x40000003/ebx):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_40000003_ecx_microsoft(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "maximum process power state"             ,  0,  3, NIL_IMAGES },
+        };
+
+   printf("   hypervisor power management features (0x40000003/ebx):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_40000003_edx_microsoft(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "MWAIT available"                         ,  0,  0, bools },
+          { "guest debugging support available"       ,  1,  1, bools },
+          { "performance monitor support available"   ,  2,  2, bools },
+          { "CPU dynamic partitioning events avail"   ,  3,  3, bools },
+          { "hypercall XMM input parameters available",  4,  4, bools },
+          { "virtual guest idel state available"      ,  5,  5, bools },
+        };
+
+   printf("   hypervisor feature identification (0x40000003/edx):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_40000004_eax_microsoft(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "use hypercalls for AS switches"          ,  0,  0, bools },
+          { "use hypercalls for TLB flushes"          ,  1,  1, bools },
+          { "use hypercalls for remote TLB flushes"   ,  2,  2, bools },
+          { "use MSRs to access EOI, ICR, TPR"        ,  3,  3, bools },
+          { "use MSRs to initiate system RESET"       ,  4,  4, bools },
+          { "use relaxed timing"                      ,  5,  5, bools },
+        };
+
+   printf("   hypervisor recommendations (0x40000004/eax):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
+}
+
+static void
+print_40000006_eax_microsoft(unsigned int  value)
+{
+   static named_item  names[]
+      = { { "APIC overlay assist"                     ,  0,  0, bools },
+          { "MSR bitmaps"                             ,  1,  1, bools },
+          { "performance counters"                    ,  2,  2, bools },
+          { "second-level address translation"        ,  3,  3, bools },
+        };
+
+   printf("   hypervisor hardware features used (0x40000006/eax):\n");
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 0);
 }
 
 static void
@@ -4825,6 +5046,29 @@ print_c0000001_edx(unsigned int  value)
 }
 
 static void
+print_c0000002_eax(unsigned int  value)
+{
+   // This information is from Juerg Haefliger.
+   // TODO: figure out how to decode the rest of this
+   static named_item  names[]
+      = { { "core temperature (degrees C)"       ,  8, 15, NIL_IMAGES },
+        };
+
+   print_names(value, names, LENGTH(names, named_item),
+               /* max_len => */ 28);
+}
+
+static void
+print_c0000002_ebx(unsigned int  value)
+{
+   // This information is from Juerg Haefliger.
+   // TODO: figure out how to decode the rest of this
+   printf("      input voltage (mV)           = %d (0x%0x)\n",
+          (BIT_EXTRACT_LE(value, 0, 8) << 4) + 700,
+          BIT_EXTRACT_LE(value, 0, 8));
+}
+
+static void
 usage(void)
 {
    printf("usage: %s [options...]\n", program);
@@ -4923,6 +5167,10 @@ explain_dev_cpu_errno(void)
    (   (words)[WORD_EBX] == FOUR_CHARS_VALUE(&(s)[0]) \
     && (words)[WORD_EDX] == FOUR_CHARS_VALUE(&(s)[4]) \
     && (words)[WORD_ECX] == FOUR_CHARS_VALUE(&(s)[8]))
+#define IS_HYPERVISOR_ID(words, s)                    \
+   (   (words)[WORD_EBX] == FOUR_CHARS_VALUE(&(s)[0]) \
+    && (words)[WORD_ECX] == FOUR_CHARS_VALUE(&(s)[4]) \
+    && (words)[WORD_EDX] == FOUR_CHARS_VALUE(&(s)[8]))
 
 static void
 print_reg_raw (unsigned int        reg,
@@ -4947,7 +5195,7 @@ print_reg (unsigned int        reg,
    } else if (reg == 0) {
       // max already set to words[WORD_EAX]
       stash->val_0_eax = words[WORD_EAX];
-      printf("   vendor_id = \"%4.4s%4.4s%4.4s\"\n",
+      printf("   vendor_id = \"%-4.4s%-4.4s%-4.4s\"\n",
              (const char*)&words[WORD_EBX], 
              (const char*)&words[WORD_EDX], 
              (const char*)&words[WORD_ECX]);
@@ -5008,6 +5256,7 @@ print_reg (unsigned int        reg,
       print_4_edx(words[WORD_EDX]);
       printf("      number of sets - 1 (s)               = %u\n",
              words[WORD_ECX]);
+      stash->saw_4 = TRUE;
       if (try == 0) {
          stash->val_4_eax = words[WORD_EAX];
       }
@@ -5037,6 +5286,7 @@ print_reg (unsigned int        reg,
       printf("      --- level %d (%s) ---\n", try,  (try == 0 ? "thread" :
                                                      try == 1 ? "core" :
                                                                 "package"));
+      stash->saw_b = TRUE;
       if (try < sizeof(stash->val_b_eax) / sizeof(stash->val_b_eax[0])) {
          stash->val_b_eax[try] = words[WORD_EAX];
       }
@@ -5073,6 +5323,89 @@ print_reg (unsigned int        reg,
       } else {
          print_reg_raw(reg, try, words);
       }
+   } else if (reg == 0x40000000) {
+      // max already set to words[WORD_EAX]
+      printf("   hypervisor_id = \"%-4.4s%-4.4s%-4.4s\"\n",
+             (const char*)&words[WORD_EBX], 
+             (const char*)&words[WORD_ECX], 
+             (const char*)&words[WORD_EDX]);
+      if (IS_HYPERVISOR_ID(words, "VMwareVMware")) {
+         stash->hypervisor = HYPERVISOR_VMWARE;
+      } else if (IS_HYPERVISOR_ID(words, "XenVMMXenVMM")) {
+         stash->hypervisor = HYPERVISOR_XEN;
+      } else if (IS_HYPERVISOR_ID(words, "KVMKVMKVM\0\0\0")) {
+         stash->hypervisor = HYPERVISOR_KVM;
+      } else if (IS_HYPERVISOR_ID(words, "Microsoft Hv")) {
+         stash->hypervisor = HYPERVISOR_MICROSOFT;
+      }
+   } else if (reg == 0x40000001 && stash->hypervisor == HYPERVISOR_XEN) {
+      printf("   hypervisor version (0x40000001/eax):\n");
+      printf("      version = %d.%d\n", 
+             BIT_EXTRACT_LE(words[WORD_EAX], 16, 32),
+             BIT_EXTRACT_LE(words[WORD_EAX],  0, 16));
+   } else if (reg == 0x40000002 && stash->hypervisor == HYPERVISOR_XEN) {
+      printf("   hypervisor features (0x40000002):\n");
+      printf("      number of hypercall-transfer pages = 0x%0x (%u)\n",
+             words[WORD_EAX], words[WORD_EAX]);
+      printf("      MSR base address                   = 0x%0x\n",
+             words[WORD_EBX]);
+      print_40000002_ecx_xen(words[WORD_ECX]);
+   } else if (reg == 0x40000003 && stash->hypervisor == HYPERVISOR_XEN
+              && try == 0) {
+      print_40000003_eax_xen(words[WORD_EAX]);
+      printf("      tsc mode            = 0x%0x (%u)\n",
+             words[WORD_EBX], words[WORD_EBX]);
+      printf("      tsc frequency (kHz) = %u\n",
+             words[WORD_ECX]);
+      printf("      incarnation         = 0x%0x (%u)\n",
+             words[WORD_EDX], words[WORD_EDX]);
+   } else if (reg == 0x40000003 && stash->hypervisor == HYPERVISOR_XEN
+              && try == 1) {
+      unsigned long long  vtsc_offset
+         = ((unsigned long long)words[WORD_EAX]
+            + ((unsigned long long)words[WORD_EAX] << 32));
+      printf("      vtsc offset   = 0x%0llx (%llu)\n", vtsc_offset, vtsc_offset);
+      printf("      vtsc mul_frac = 0x%0x (%u)\n",
+             words[WORD_ECX], words[WORD_ECX]);
+      printf("      vtsc shift    = 0x%0x (%u)\n",
+             words[WORD_EDX], words[WORD_EDX]);
+   } else if (reg == 0x40000003 && stash->hypervisor == HYPERVISOR_XEN
+              && try == 2) {
+      printf("      cpu frequency (kHZ) = %u\n", words[WORD_EAX]);
+   } else if (reg == 0x40000002 && stash->hypervisor == HYPERVISOR_MICROSOFT) {
+      printf("   hypervisor system identity (0x40000002):\n");
+      printf("      build          = %d\n", words[WORD_EAX]);
+      printf("      version        = %d.%d\n",
+             BIT_EXTRACT_LE(words[WORD_EBX], 16, 32),
+             BIT_EXTRACT_LE(words[WORD_EBX],  0, 16));
+      printf("      service pack   = %d\n", words[WORD_ECX]);
+      printf("      service branch = %d\n",
+             BIT_EXTRACT_LE(words[WORD_EDX], 24, 32));
+      printf("      service number = %d\n",
+             BIT_EXTRACT_LE(words[WORD_EDX],  0, 24));
+   } else if (reg == 0x40000001 && stash->hypervisor == HYPERVISOR_KVM) {
+      print_40000001_eax_kvm(words[WORD_EAX]);
+   } else if (reg == 0x40000003 && stash->hypervisor == HYPERVISOR_MICROSOFT) {
+      print_40000003_eax_microsoft(words[WORD_EAX]);
+      print_40000003_ebx_microsoft(words[WORD_EBX]);
+      print_40000003_ecx_microsoft(words[WORD_ECX]);
+      print_40000003_edx_microsoft(words[WORD_EDX]);
+   } else if (reg == 0x40000004 && stash->hypervisor == HYPERVISOR_MICROSOFT) {
+      print_40000004_eax_microsoft(words[WORD_EAX]);
+      printf("      maximum number of spinlock retry attempts = 0x%0x (%u)\n",
+             words[WORD_EBX], words[WORD_EBX]);
+   } else if (reg == 0x40000005 && stash->hypervisor == HYPERVISOR_MICROSOFT) {
+      printf("   hypervisor implementation limits (0x40000005):\n");
+      printf("      maximum number of virtual processors = 0x%0x (%u)\n",
+             words[WORD_EAX], words[WORD_EAX]);
+      printf("      maximum number of logical processors = 0x%0x (%u)\n",
+             words[WORD_EBX], words[WORD_EBX]);
+   } else if (reg == 0x40000006 && stash->hypervisor == HYPERVISOR_MICROSOFT) {
+      print_40000006_eax_microsoft(words[WORD_EAX]);
+   } else if (reg == 0x40000010) {
+      printf("   hypervisor generic timing information (0x40000010):\n");
+      printf("      TSC frequency (Hz) = %d\n", words[WORD_EAX]);
+      printf("      bus frequency (Hz) = %d\n", words[WORD_EBX]);
    } else if (reg == 0x80000000) {
       // max already set to words[WORD_EAX]
    } else if (reg == 0x80000001) {
@@ -5174,11 +5507,23 @@ print_reg (unsigned int        reg,
    } else if (reg == 0xc0000001) {
       if (stash->vendor == VENDOR_VIA) {
          /* TODO: figure out how to decode 0xc0000001:eax */
-         printf("   0x%08x: eax=0x%08x\n", 
-                (unsigned int)reg, words[WORD_EAX]);
+         printf("   0x%08x 0x%02x: eax=0x%08x\n", 
+                (unsigned int)reg, try, words[WORD_EAX]);
          print_c0000001_edx(words[WORD_EDX]);
       } else {
-         /* DO NOTHING */
+         print_reg_raw(reg, try, words);
+      }
+   } else if (reg == 0xc0000002) {
+      if (stash->vendor == VENDOR_VIA) {
+         printf("   VIA C7 Temperature/Voltage Sensors (0xc0000002):\n");
+         print_c0000002_eax(words[WORD_EAX]);
+         print_c0000002_ebx(words[WORD_EBX]);
+         /* TODO: figure out how to decode 0xc0000001:ecx & edx */
+         printf("   0x%08x 0x%02x: ebx=0x%08x ecx=0x%08x edx=0x%08x\n",
+                (unsigned int)reg, try,
+                words[WORD_EBX], words[WORD_ECX], words[WORD_EDX]);
+      } else {
+         print_reg_raw(reg, try, words);
       }
    } else {
       print_reg_raw(reg, try, words);
@@ -5401,6 +5746,12 @@ print_header (unsigned int  reg,
          printf("   deterministic cache parameters (4):\n");
       } else if (reg == 0xb) {
          printf("   x2APIC features / processor topology (0xb):\n");
+      } else if (reg == 0x40000003 && try == 0) {
+         printf("   hypervisor time features (0x40000003/00):\n");
+      } else if (reg == 0x40000003 && try == 1) {
+         printf("   hypervisor time scale & offset (0x40000003/01):\n");
+      } else if (reg == 0x40000003 && try == 2) {
+         printf("   hypervisor time physical cpu frequency (0x40000003/02):\n");
       } else if (reg == 0x8000001d) {
          printf("   Cache Properties (0x8000001d):\n");
       }
@@ -5484,6 +5835,14 @@ do_real(boolean  one_cpu,
             print_reg(reg, words, raw, 2, &stash);
             real_get(cpuid_fd, reg, words, 0x3e, FALSE);
             print_reg(reg, words, raw, 0x3e, &stash);
+         } else if (reg == 0x40000003 && stash.hypervisor == HYPERVISOR_XEN) {
+            unsigned int  try = 0;
+            for (; try <= 2; try++) {
+               print_header(reg, try, raw);
+               print_reg(reg, words, raw, try, &stash);
+               try++;
+               real_get(cpuid_fd, reg, words, try, FALSE);
+            }
          } else if (reg == 0x8000001d) {
             unsigned int  try = 0;
             while ((words[WORD_EAX] & 0x1f) != 0) {
@@ -5494,6 +5853,27 @@ do_real(boolean  one_cpu,
             }
          } else {
             print_reg(reg, words, raw, 0, &stash);
+         }
+      }
+
+      max = 0x40000000;
+      for (reg = 0x40000000; reg <= max; reg++) {
+         boolean       success;
+         unsigned int  words[WORD_NUM];
+
+         success = real_get(cpuid_fd, reg, words, 0, TRUE);
+         if (!success) break;
+
+         if (reg == 0x40000000) {
+            max = words[WORD_EAX];
+         }
+
+         print_reg(reg, words, raw, 0, &stash);
+
+         if (reg == 0x40000000
+             && stash.hypervisor == HYPERVISOR_KVM
+             && max == 0) {
+            max = 0x40000001;
          }
       }
 

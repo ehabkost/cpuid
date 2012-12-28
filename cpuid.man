@@ -1,7 +1,7 @@
 .\"
-.\" $Id: cpuid.man,v 20110305 2011/03/05 05:36:00 todd $
+.\" $Id: cpuid.man,v 20120225 2012/02/25 11:31:00 todd $
 .\"
-.TH CPUID 1 "5 Mar 2011" "20110305"
+.TH CPUID 1 "5 Mar 2011" "20120225"
 .SH NAME 
 cpuid \- Dump CPUID information for each CPU
 .SH SYNOPSIS
@@ -118,10 +118,6 @@ information is incorrect.  The information seems to indicate the
 architecture's capabilities, rather than what the particular chip actually
 does.  In particular, it seems commonplace to claim the presence of multiple
 hyperthreads when there is only one.
-
-Function 0x8000001b appears to be implemented on newer AMD chips, such as
-Magny-Cours.  But AMD's latest CPUID specification is woefully out of date,
-from around April 2008, and I don't know how to decode this function.
 .SH INFORMATION SOURCES
 Information on the CPUID instruction and on specific CPUs is available from
 the following documents from Intel Corporation
@@ -339,6 +335,11 @@ Specification Update
 324643: 2nd Generation Intel Core Processor Family Desktop Specification Update
 .br
 324827: 2nd Generation Intel Core Processor Family Mobile Specification Update
+.br
+325122: Intel Xeon Processor E7-8800 / 4800 / 2800 Product Families
+Specification Update
+.br
+325630: Intel Atom Processor Z6xx Series Specification Update
 .RE
 
 Information on the CPUID instruction and on specific CPUs is available from
@@ -386,6 +387,10 @@ Processors
 41322: Revision Guide for AMD Family 10h Processors
 .br
 41788: Revision Guide for AMD Family 11h Processors
+.br
+47534: Revision Guide for AMD Family 14h Models 00h-0Fh Processors
+.br
+48063: Revision Guide for AMD Family 15h Models 00h-0Fh Processors
 .RE
 
 Information on the CPUID instruction and on specific CPUs is available
@@ -396,6 +401,16 @@ from the following documents from Transmeta Corporation
 .br
 Processor Recognition, 2002/05/07
 .RE
+
+Information on generic hypervisor CPUID levels is available from this proposal:
+<http://lwn.net/Articles/301888/>.
+
+Information on KVM hypervisor CPUID levels is available from the Linux kernel
+under Documentation/kvm/cpuid.txt.
+
+Information on Microsoft hypervisor CPUID levels is available from the
+following document from Microsoft:
+<http://msdn.microsoft.com/en-us/library/windows/hardware/ff542428%28v=vs.85%29.aspx>.
 
 Also, information is available from the following web sites:
 
