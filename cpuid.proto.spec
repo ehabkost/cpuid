@@ -1,5 +1,3 @@
-%define version 20060207
-%define release 1
 Summary: dumps CPUID information about the CPU(s)
 Name: cpuid
 Version: %{version}

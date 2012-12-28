@@ -1,0 +1,19 @@
+Tue Feb  7 2006 Todd Allen <todd.allen@etallen.com>
+
+	* cpuid.c: Correctly distinguish Egypt/Italy processors.
+	* cpuid.c: Fixed minor problems in error checking in open_file().
+	* cpuid.spec: Fixed bad Packager field.
+	* cpuid.spec: Include ChangeLog.
+	* cpuid.man: Added -r/--raw description.
+	* cpuid.man: Clarified info used for (synth) field.
+	* cpuid.man: Fixed version number & date.
+	* Makefile: Reworked to make it easy for people other than me to build 
+	  and install.
+	* cpuid.spec: Used new Makefile organization
+	* Makefile: Fixed production of spec file so that it's possible to
+	  rebuild with the srpm without having to specify %version and
+	  %release.
+
+Mon Feb  6 2006 Todd Allen <todd.allen@etallen.com>
+
+	* Initial public release.

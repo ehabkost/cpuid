@@ -250,6 +250,7 @@ typedef enum {
    dS, /*                                       Sempron                       */
    MS, /*                             mobile    Sempron                       */
    DO, /*                             Dual Core Opteron                       */
+   D8, /*                             Dual Core Opteron (8xx)                 */
    MT, /*                             mobile    Turion                        */
    t2, /*                                                           TMx200    */
    t4, /*                                                           TMx400    */
@@ -554,6 +555,7 @@ specialize_amd_model(code_t               result,
    if (stash->vendor == VENDOR_AMD) {
       switch (result) {
       case dO:
+      case DO:
          switch (__XFXM(stash->val_1_eax)) {
          case _XF(0) + _F(15) + _XM(2) + _M(1): /* Italy/Egypt */
          case _XF(0) + _F(15) + _XM(2) + _M(5): /* Troy/Athens */
@@ -600,13 +602,17 @@ specialize_amd_model(code_t               result,
                case 0x36:
                case 0x37:
                   /* It's an 8xx */
-                  /* 
-                  ** To distinguish:
-                  **    Egypy from Italy
-                  **    Athens from Troy
-                  */
-                  result = d8;
-                  break;
+                  switch (result) {
+                  case dO:
+                     result = d8; /* to distinguish Athens from Troy */
+                     break;
+                  case DO:
+                     result = D8; /* to distinguish Egypt from Italy */
+                     break;
+                  default:
+                     /* Shouldn't happen */
+                     break;
+                  }
                }
             }
          }
@@ -1273,11 +1279,11 @@ print_synth_amd(const char*          name,
    XFXMC (0, 1, 15,     dA, "AMD Athlon 64 (Winchester DH8), 939-pin, 90nm");
    XFXMC (0, 1, 15,     dS, "AMD Sempron (Palermo DH8), 939-pin, 90nm");
    XFXM  (0, 1, 15,         "AMD Athlon 64 (Winchester DH8) / Sempron (Palermo DH8), 939-pin, 90nm");
-   XFXMSC(0, 2,  1,  0, dO, "AMD Dual Core Opteron (Italy JH-E1), 940-pin, 90nm");
-   XFXMSC(0, 2,  1,  0, d8, "AMD Dual Core Opteron (Egypt JH-E1), 940-pin, 90nm");
+   XFXMSC(0, 2,  1,  0, DO, "AMD Dual Core Opteron (Italy JH-E1), 940-pin, 90nm");
+   XFXMSC(0, 2,  1,  0, D8, "AMD Dual Core Opteron (Egypt JH-E1), 940-pin, 90nm");
    XFXMS (0, 2,  1,  0,     "AMD Dual Core Opteron (Italy/Egypt JH-E1), 940-pin, 90nm");
-   XFXMSC(0, 2,  1,  2, dO, "AMD Dual Core Opteron (Italy JH-E6), 940-pin, 90nm");
-   XFXMSC(0, 2,  1,  2, d8, "AMD Dual Core Opteron (Egypt JH-E6), 940-pin, 90nm");
+   XFXMSC(0, 2,  1,  2, DO, "AMD Dual Core Opteron (Italy JH-E6), 940-pin, 90nm");
+   XFXMSC(0, 2,  1,  2, D8, "AMD Dual Core Opteron (Egypt JH-E6), 940-pin, 90nm");
    XFXMS (0, 2,  1,  2,     "AMD Dual Core Opteron (Italy/Egypt JH-E6), 940-pin, 90nm");
    XFXM  (0, 2,  1,         "AMD Dual Core Opteron (Italy/Egypt JH), 940-pin, 90nm");
    XFXMSC(0, 2,  3,  2, DO, "AMD Dual Core Opteron (Denmark JH-E6), 939-pin, 90nm");
@@ -2861,6 +2867,49 @@ usage(void)
    exit(1);
 }
 
+static void
+explain_errno(void)
+{
+   if (errno == ENODEV || errno == ENXIO) {
+      fprintf(stderr,
+              "%s: if running a modular kernel, execute"
+              " \"modprobe cpuid\",\n",
+              program);
+      fprintf(stderr,
+              "%s: wait a few seconds, and then try again\n",
+              program);
+   } else if (errno == ENOENT) {
+      fprintf(stderr,
+              "%s: if running a modular kernel, execute"
+              " \"modprobe cpuid\",\n",
+              program);
+      fprintf(stderr,
+              "%s: wait a few seconds, and then try again;\n",
+              program);
+      fprintf(stderr,
+              "%s: if it still fails, try executing:\n",
+              program);
+      fprintf(stderr,
+              "%s:    mknod /dev/cpu/0/cpuid c %u 0\n",
+              program, CPUID_MAJOR);
+      fprintf(stderr,
+              "%s:    mknod /dev/cpu/1/cpuid c %u 1\n",
+              program, CPUID_MAJOR);
+      fprintf(stderr,
+              "%s:    etc.\n",
+              program);
+      fprintf(stderr,
+              "%s: and then try again\n",
+              program);
+   } else if ((errno == EPERM || errno == EACCES) && getuid() != 0) {
+      fprintf(stderr,
+              "%s: on most systems,"
+              " it is necessary to execute this as root\n",
+              program);
+   }
+   exit(1);
+}
+
 static int
 open_file(unsigned int cpu)
 {
@@ -2873,19 +2922,25 @@ open_file(unsigned int cpu)
          fprintf(stderr, 
                  "%s: cannot open /dev/cpuid; errno = %d (%s)\n", 
                  program, errno, strerror(errno));
-         if (errno == EACCES && getuid() != 0) {
-            fprintf(stderr,
-                    "%s: on most systems,"
-                    " it is necessary to execute this as root\n",
-                    program);
-         }
-         exit(1);
+         explain_errno();
       }
    }
 
    if (cpuid_fd == -1) {
       sprintf(cpuid_name, "/dev/cpu/%u/cpuid", cpu);
       cpuid_fd = open(cpuid_name, O_RDONLY);
+      if (cpuid_fd == -1) {
+         if (cpu > 0) {
+            if (errno == ENXIO)  return -1;
+            if (errno == ENODEV) return -1;
+         }
+         if (errno != ENOENT) {
+            fprintf(stderr, 
+                    "%s: cannot open /dev/cpuid or %s; errno = %d (%s)\n", 
+                    program, cpuid_name, errno, strerror(errno));
+            explain_errno();
+         }
+      }
    }
 
    if (cpuid_fd == -1) {
@@ -2912,56 +2967,16 @@ open_file(unsigned int cpu)
             remove(tmpname);
          }
       }
-   }
-
-   if (cpuid_fd == -1) {
-      if (cpu > 0) {
-         if (errno == ENOENT) return -1;
-         if (errno == ENXIO)  return -1;
-         if (errno == ENODEV) return -1;
+      if (cpuid_fd == -1) {
+         if (cpu > 0) {
+            if (errno == ENXIO)  return -1;
+            if (errno == ENODEV) return -1;
+         }
+         fprintf(stderr, 
+                 "%s: cannot open /dev/cpuid or %s; errno = %d (%s)\n", 
+                 program, cpuid_name, errno, strerror(errno));
+         explain_errno();
       }
-
-      fprintf(stderr, 
-              "%s: cannot open /dev/cpuid or %s; errno = %d (%s)\n", 
-              program, cpuid_name, errno, strerror(errno));
-      if (errno == ENODEV || errno == ENXIO) {
-         fprintf(stderr,
-                 "%s: if running a modular kernel, execute"
-                 " \"modprobe cpuid\",\n",
-                 program);
-         fprintf(stderr,
-                 "%s: wait a few seconds, and then try again\n",
-                 program);
-      } else if (errno == ENOENT) {
-         fprintf(stderr,
-                 "%s: if running a modular kernel, execute"
-                 " \"modprobe cpuid\",\n",
-                 program);
-         fprintf(stderr,
-                 "%s: wait a few seconds, and then try again;\n",
-                 program);
-         fprintf(stderr,
-                 "%s: if it still fails, try executing:\n",
-                 program);
-         fprintf(stderr,
-                 "%s:    mknod /dev/cpu/0/cpuid c %u 0\n",
-                 program, CPUID_MAJOR);
-         fprintf(stderr,
-                 "%s:    mknod /dev/cpu/1/cpuid c %u 1\n",
-                 program, CPUID_MAJOR);
-         fprintf(stderr,
-                 "%s:    etc.\n",
-                 program);
-         fprintf(stderr,
-                 "%s: and then try again\n",
-                 program);
-      } else if (errno == EACCES && getuid() != 0) {
-         fprintf(stderr,
-                 "%s: on most systems,"
-                 " it is necessary to execute this as root\n",
-                 program);
-      }
-      exit(1);
    }
 
    return cpuid_fd;

@@ -1,7 +1,7 @@
 .\"
-.\" $Id: cpuid.man,v 2.1 2006/01/13 14:24:07 todd $
+.\" $Id: cpuid.man,v 20060207 2006/02/07 19:21:00 todd $
 .\"
-.TH CPUID 1 "13 January 2006" "V2.1"
+.TH CPUID 1 "7 Februrary 2006" "20060207"
 .SH NAME 
 cpuid \- Dump CPUID information for each CPU
 .SH SYNOPSIS
@@ -37,11 +37,11 @@ is based on the following information:
 	version information (1/eax), stepping id
 	version information (1/eax), extended family
 	version information (1/eax), extended model
-	brand id
-	brand
-	extended brand id
+	brand id (1/ebx)
+	brand (0x80000004)
 	cache and TLB information (2)
-	Transmeta processor revision ID
+	AMD extended brand id (0x80000001/ebx)
+	Transmeta processor revision ID (0x80860001/ebx & ecx)
 .fi
 
 In addition, a simpler determination of the CPU is performed using only the
@@ -57,6 +57,9 @@ accepts the following command line argument:
 Display information only for the first CPU.  This cuts down on the output on
 a multiprocessor system, and is useful when certain that all CPUs are
 identical.
+.TP 8
+.I -r, --raw
+Display only raw hex information with no decoding.
 .SH LIMITATIONS
 There is no known way to distinguish between some versions of the following
 CPUs:
@@ -232,4 +235,4 @@ liable for any claim, damages, or other liability, whether in action of
 contract, tort, or otherwise, arising from, out of, or in connection with
 this software.
 .SH AUTHOR
-Todd Allen <etoddallen@comcast.net>
+Todd Allen <cpuid@etallen.com>

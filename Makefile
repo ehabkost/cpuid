@@ -15,31 +15,51 @@ DEBUG_RPM=$(PACKAGE)-debuginfo-$(VERSION)-$(RELEASE).$(ARCH).rpm
 
 SRCS=cpuid.c
 
-OTHER_SRCS=Makefile cpuid.man cpuid.spec
+OTHER_SRCS=Makefile $(PROG).man $(PACKAGE).proto.spec $(PACKAGE).spec \
+           ChangeLog FUTURE
+OTHER_BINS=$(PROG).man
 
 REL_DIR=../$(shell date +%Y-%m-%d)
-WEB_DIR=/toad1/apps.mine/web/$(PROG)
+WEB_DIR=/toad1/apps.mine/www/www/$(PROG)
 
 DEV_X86_64_HOST=iggy
 
-default: $(PROG)
+BUILDROOT=
+
+default: $(PROG) $(PROG).man.gz
+
+$(PROG).man.gz: $(PROG).man
+	gzip < $< > $@
+
+install: $(PROG) $(PROG).man.gz
+	install -D -s -m 755 -o 0 -g 0 $(PROG)        $(BUILDROOT)/usr/bin/$(PROG)
+	install -D    -m 444 -o 0 -g 0 $(PROG).man.gz $(BUILDROOT)/usr/share/man/man1/$(PROG).1.gz
+
+clean:
+	rm -f $(PROG) $(PROG).x86_64
+	rm -f $(PACKAGE).spec $(PROG).man.gz
+	rm -f $(SRC_TAR) $(BIN_TAR)
+	rm -f $(RPMS)
+	rm -f $(DEBUG_RPM)
 
 # Todd's Development rules
 
-cpuid.x86_64: cpuid.c
+$(PROG).x86_64: cpuid.c
 	scp -p cpuid.c $(DEV_X86_64_HOST):/tmp
-	ssh $(DEV_X86_64_HOST) $(CC) $(CFLAGS) -o /tmp/cpuid /tmp/cpuid.c
-	scp -p $(DEV_X86_64_HOST):/tmp/cpuid $@
+	ssh $(DEV_X86_64_HOST) $(CC) $(CFLAGS) -o /tmp/$(PROG) /tmp/cpuid.c
+	scp -p $(DEV_X86_64_HOST):/tmp/$(PROG) $@
 
-install: cpuid cpuid.x86_64
-	cp -p cpuid ~/.bin/execs/i586/cpuid
-	cp -p cpuid.x86_64 ~/.bin/execs/x86_64/cpuid
-	(cd ~/.bin/execs; prop i586/cpuid x86_64/cpuid)
-
-clean:
-	rm -f $(PROG) cpuid.x86_64
+todd: $(PROG) $(PROG).x86_64
+	cp -p $(PROG) ~/.bin/execs/i586/$(PROG)
+	cp -p $(PROG).x86_64 ~/.bin/execs/x86_64/$(PROG)
+	(cd ~/.bin/execs; prop i586/$(PROG) x86_64/$(PROG))
 
 # Release rules
+
+$(PACKAGE).spec: $(PACKAGE).proto.spec
+	@(echo "%define version $(VERSION)"; \
+	  echo "%define release $(RELEASE)"; \
+	  cat $<) > $@
 
 $(SRC_TAR): $(SRCS) $(OTHER_SRCS) Makefile
 	@echo Tarring source
@@ -49,11 +69,11 @@ $(SRC_TAR): $(SRCS) $(OTHER_SRCS) Makefile
 	@tar cvf - $(PACKAGE)-$(VERSION) | gzip -c >| $(SRC_TAR)
 	@rm -rf $(PACKAGE)-$(VERSION)
 
-$(BIN_TAR): $(PROG) cpuid.man
+$(BIN_TAR): $(PROG) $(OTHER_BINS)
 	@echo Tarring binary
 	@rm -rf $(PACKAGE)-$(VERSION)
 	@mkdir $(PACKAGE)-$(VERSION)
-	@ls -1d $(PROG) cpuid.man | cpio -pdmuv $(PACKAGE)-$(VERSION)
+	@ls -1d $(PROG) $(OTHER_BINS) | cpio -pdmuv $(PACKAGE)-$(VERSION)
 	@(cd $(PACKAGE)-$(VERSION); strip $(PROG))
 	@tar cvf - $(PACKAGE)-$(VERSION) | gzip -c >| $(BIN_TAR)
 	@rm -rf $(PACKAGE)-$(VERSION)
@@ -65,8 +85,6 @@ $(RPMS) $(DEBUG_RPM): $(SRC_TAR) $(PACKAGE).spec
 	@rm -rf build
 	@mkdir build
 	@rpmbuild -ba \
-	          --define "version $(VERSION)" \
-	          --define "release $(RELEASE)" \
 	          --buildroot "${PWD}/build" \
 	          --define "_builddir ${PWD}/build" \
 	          --define "_rpmdir ${PWD}" \
@@ -76,25 +94,26 @@ $(RPMS) $(DEBUG_RPM): $(SRC_TAR) $(PACKAGE).spec
 	          --define "__check_files ''" \
 	          --define "_rpmfilename %%{NAME}-%%{VERSION}-%%{RELEASE}.%%{ARCH}.rpm" \
 	          $(PACKAGE).spec
-	@rmdir --ignore-fail-on-non-empty build
+	@rm -rf build
 
 rpm: $(RPMS)
 
 # Todd's release rules
 
-release: $(PROG) cpuid.x86_64 $(SRC_TAR) $(BIN_TAR) $(RPMS)
+release: $(PROG) $(PROG).x86_64 $(SRC_TAR) $(BIN_TAR) $(RPMS)
 	if [ -d $(REL_DIR) ]; then                         \
 	   echo "Makefile: $(REL_DIR) already exists" >&2; \
 	   exit 1;                                         \
 	fi
 	mkdir $(REL_DIR)
-	cp -p $(PROG) cpuid.x86_64 $(SRCS) $(OTHER_SRCS) $(REL_DIR)
+	cp -p $(PROG) $(PROG).x86_64 $(SRCS) $(OTHER_SRCS) $(REL_DIR)
 	mv $(SRC_TAR) $(BIN_TAR) $(RPMS) $(REL_DIR)
 	if [ -e $(DEBUG_RPM) ]; then   \
 	   mv $(DEBUG_RPM) $(REL_DIR); \
 	fi
 	chmod -w $(REL_DIR)/*
 	cp -f -p $(REL_DIR)/*.tar.gz $(REL_DIR)/*.rpm $(WEB_DIR)
+	rm -f $(PACKAGE).spec
 
 rerelease:
 	rm -rf $(REL_DIR)
